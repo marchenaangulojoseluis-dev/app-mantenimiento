@@ -140,7 +140,36 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
   .add-tarea-row input[type=text]{width:100%}
   .section-head{flex-wrap:wrap}
 }
+
+/* BACKUP SECTION */
+.backup-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:0}
+.backup-card{background:var(--surface2);border:1.5px solid var(--border);border-radius:10px;padding:20px}
+.backup-card h3{font-size:13px;font-weight:700;color:var(--blue);margin-bottom:6px}
+.backup-card p{font-size:12px;color:var(--muted2);margin-bottom:16px;line-height:1.5}
+.backup-files{display:flex;flex-direction:column;gap:6px;margin-bottom:16px}
+.backup-file{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--muted2);font-family:var(--mono)}
+.backup-file span{width:8px;height:8px;border-radius:50%;background:var(--blue);flex-shrink:0}
+.import-mode{display:flex;gap:8px;margin-bottom:14px}
+.import-mode label{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--accent);cursor:pointer;padding:6px 12px;border:1.5px solid var(--border);border-radius:6px;transition:all .15s;flex:1;justify-content:center}
+.import-mode label:hover{border-color:var(--blue)}
+.import-mode input[type=radio]{accent-color:var(--blue)}
+.import-mode input[type=radio]:checked + span{color:var(--blue);font-weight:600}
+.import-mode label:has(input:checked){border-color:var(--blue);background:var(--blue-pale)}
+.drop-zone{border:2px dashed var(--border);border-radius:8px;padding:20px;text-align:center;cursor:pointer;transition:all .2s;background:var(--surface)}
+.drop-zone:hover,.drop-zone.drag-over{border-color:var(--blue);background:var(--blue-pale)}
+.drop-zone p{font-size:12px;color:var(--muted2);margin:0}
+.drop-zone strong{font-size:13px;color:var(--blue)}
+.import-progress{margin-top:12px;display:none}
+.import-progress.show{display:block}
+.import-log{background:#1a2540;border-radius:8px;padding:12px;margin-top:8px;max-height:140px;overflow-y:auto}
+.import-log p{font-family:var(--mono);font-size:11px;color:#a0b8d8;margin:0;line-height:1.8}
+.import-log p.ok{color:#4ddd88}
+.import-log p.err{color:#ff7788}
+.import-log p.info{color:#ffc266}
+@media(max-width:600px){.backup-grid{grid-template-columns:1fr}}
+
 </style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
 
@@ -168,6 +197,57 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
       </div>
     </div>
   </div>
+
+  <div class="section" style="margin-top:0">
+    <div class="section-head">
+      <h2>💾 Backup — Export / Import</h2>
+    </div>
+    <div class="section-body">
+      <div class="backup-grid">
+
+        <!-- EXPORT -->
+        <div class="backup-card">
+          <h3>📤 Exportar backup</h3>
+          <p>Descarga un ZIP con todos los datos del sistema en formato CSV.</p>
+          <div class="backup-files">
+            <div class="backup-file"><span></span>inventario.csv</div>
+            <div class="backup-file"><span></span>mantenimiento.csv</div>
+            <div class="backup-file"><span></span>usuarios.csv</div>
+            <div class="backup-file"><span></span>tareas_config.csv</div>
+          </div>
+          <button class="btn btn-primary" onclick="exportBackup()" id="export-btn" style="width:100%">
+            ⬇ Descargar ZIP
+          </button>
+        </div>
+
+        <!-- IMPORT -->
+        <div class="backup-card">
+          <h3>📥 Importar backup</h3>
+          <p>Restaura datos desde un ZIP de backup. Elige el modo de importación.</p>
+          <div class="import-mode">
+            <label><input type="radio" name="import-mode" value="replace" checked><span>🔄 Reemplazar todo</span></label>
+            <label><input type="radio" name="import-mode" value="merge"><span>🔀 Fusionar</span></label>
+          </div>
+          <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()"
+            ondragover="event.preventDefault();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="handleFileDrop(event)">
+            <strong>Arrastra el ZIP aquí</strong>
+            <p style="margin-top:4px">o haz clic para seleccionar</p>
+          </div>
+          <input type="file" id="file-input" accept=".zip" style="display:none" onchange="handleFileSelect(this)">
+          <div class="import-progress" id="import-progress">
+            <div class="import-log" id="import-log"></div>
+            <button class="btn btn-primary" onclick="confirmImport()" id="confirm-btn" style="width:100%;margin-top:10px">
+              ✅ Confirmar importación
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
 </main>
 
 <div class="toast" id="toast"></div>
@@ -505,6 +585,244 @@ function toast(msg, type) {
 window.addEventListener('beforeunload', function(e) {
   if (changed) { e.preventDefault(); e.returnValue = ''; }
 });
+
+// ── EXPORT BACKUP ─────────────────────────────────────────────────────────────
+async function exportBackup() {
+  const btn = document.getElementById('export-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Generando...';
+
+  try {
+    const GAS_URL = GAS;
+    
+    // Fetch all data in parallel
+    const [invRes, maintRes, usersRes, tareasRes] = await Promise.all([
+      fetch(GAS_URL).then(r => r.json()),
+      fetch(GAS_URL + '?action=getAllMaint').then(r => r.json()).catch(() => ({rows:[]})),
+      fetch(GAS_URL + '?action=getEmails').then(r => r.json()),
+      fetch(GAS_URL + '?action=getTareas').then(r => r.json())
+    ]);
+
+    const zip = new JSZip();
+
+    // 1. Inventario CSV
+    const invHeaders = ['EQ_ID','SEDE','TIPO','NOMBRE','UBICACION','MARCA','MODELO','SERIE'];
+    const invRows = (invRes.rows || []).map(r => r.map(escapeCSV).join(','));
+    zip.file('inventario.csv', [invHeaders.join(','), ...invRows].join('\n'));
+
+    // 2. Mantenimiento CSV  
+    const maintHeaders = ['CLAVE','SELECCIONADOS','TAREA_STATUS'];
+    const maintRows = (maintRes.rows || []).map(r => r.map(escapeCSV).join(','));
+    zip.file('mantenimiento.csv', [maintHeaders.join(','), ...maintRows].join('\n'));
+
+    // 3. Usuarios CSV
+    const userHeaders = ['EMAIL','ROL'];
+    const emails = usersRes.emails || [];
+    const roles = usersRes.roles || {};
+    const userRows = emails.map(e => escapeCSV(e) + ',' + escapeCSV(roles[e] || 'USUARIO'));
+    zip.file('usuarios.csv', [userHeaders.join(','), ...userRows].join('\n'));
+
+    // 4. Tareas config CSV
+    const tareasHeaders = ['TIPO','TAREA','MINUTOS','ORDEN'];
+    const tareasRows = [];
+    const tareas = tareasRes.tareas || {};
+    const minutos = tareasRes.minutos || {};
+    Object.keys(tareas).forEach(tipo => {
+      (tareas[tipo] || []).forEach((t, i) => {
+        tareasRows.push([escapeCSV(tipo), escapeCSV(t), (minutos[tipo]||[])[i]||5, i+1].join(','));
+      });
+    });
+    zip.file('tareas_config.csv', [tareasHeaders.join(','), ...tareasRows].join('\n'));
+
+    // Generate and download
+    const blob = await zip.generateAsync({type:'blob'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'backup_multiaire_' + new Date().toISOString().slice(0,10) + '.zip';
+    a.click();
+    URL.revokeObjectURL(url);
+    toast('Backup descargado ✓', 'ok');
+
+  } catch(e) {
+    toast('Error generando backup: ' + e.message, 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '⬇ Descargar ZIP';
+}
+
+function escapeCSV(val) {
+  if (val === null || val === undefined) return '';
+  const s = String(val);
+  if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+    return '"' + s.replace(/"/g, '""') + '"';
+  }
+  return s;
+}
+
+// ── IMPORT BACKUP ─────────────────────────────────────────────────────────────
+let pendingImport = null;
+
+function handleFileDrop(e) {
+  e.preventDefault();
+  document.getElementById('drop-zone').classList.remove('drag-over');
+  const file = e.dataTransfer.files[0];
+  if (file) processZip(file);
+}
+
+function handleFileSelect(input) {
+  const file = input.files[0];
+  if (file) processZip(file);
+  input.value = '';
+}
+
+async function processZip(file) {
+  if (!file.name.endsWith('.zip')) { toast('Selecciona un archivo .zip', 'err'); return; }
+  
+  const log = document.getElementById('import-log');
+  const progress = document.getElementById('import-progress');
+  log.innerHTML = '';
+  progress.classList.add('show');
+  
+  function addLog(msg, type) {
+    const p = document.createElement('p');
+    p.className = type || '';
+    p.textContent = msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  try {
+    addLog('📂 Leyendo archivo ZIP...', 'info');
+    const zip = await JSZip.loadAsync(file);
+    
+    pendingImport = { files: {} };
+    
+    const expected = ['inventario.csv','mantenimiento.csv','usuarios.csv','tareas_config.csv'];
+    for (const fname of expected) {
+      if (zip.files[fname]) {
+        pendingImport.files[fname] = await zip.files[fname].async('string');
+        addLog('✓ ' + fname + ' encontrado', 'ok');
+      } else {
+        addLog('⚠ ' + fname + ' no encontrado (se omitirá)', 'err');
+      }
+    }
+
+    const mode = document.querySelector('input[name="import-mode"]:checked').value;
+    addLog('Modo: ' + (mode === 'replace' ? '🔄 Reemplazar todo' : '🔀 Fusionar'), 'info');
+    addLog('Listo para importar. Confirma para proceder.', 'info');
+    document.getElementById('confirm-btn').style.display = 'block';
+
+  } catch(e) {
+    addLog('Error leyendo ZIP: ' + e.message, 'err');
+    pendingImport = null;
+  }
+}
+
+async function confirmImport() {
+  if (!pendingImport) return;
+  if (!maUser || maUser.rol !== 'ADMIN') { toast('Solo admins pueden importar', 'err'); return; }
+
+  const mode = document.querySelector('input[name="import-mode"]:checked').value;
+  const confirmMsg = mode === 'replace'
+    ? '⚠️ REEMPLAZAR borrará todos los datos actuales. ¿Estás seguro?'
+    : '¿Confirmas la fusión de datos?';
+  if (!confirm(confirmMsg)) return;
+
+  const log = document.getElementById('import-log');
+  const btn = document.getElementById('confirm-btn');
+  btn.disabled = true;
+  btn.textContent = '⏳ Importando...';
+
+  function addLog(msg, type) {
+    const p = document.createElement('p');
+    p.className = type || '';
+    p.textContent = msg;
+    log.appendChild(p);
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function parseCSV(text) {
+    const lines = text.trim().split('\n');
+    const headers = lines[0].split(',').map(h => h.replace(/^"|"$/g,'').trim());
+    return lines.slice(1).map(line => {
+      const vals = [];
+      let cur = '', inQ = false;
+      for (let c of line) {
+        if (c === '"') inQ = !inQ;
+        else if (c === ',' && !inQ) { vals.push(cur); cur = ''; }
+        else cur += c;
+      }
+      vals.push(cur);
+      const obj = {};
+      headers.forEach((h, i) => obj[h] = (vals[i] || '').trim());
+      return obj;
+    });
+  }
+
+  try {
+    // 1. Inventario
+    if (pendingImport.files['inventario.csv']) {
+      addLog('📦 Importando inventario...', 'info');
+      const rows = parseCSV(pendingImport.files['inventario.csv']);
+      await fetch(GAS, { method:'POST', body: JSON.stringify({
+        action: 'importInventario', rows, mode
+      })});
+      addLog('✓ Inventario importado (' + rows.length + ' equipos)', 'ok');
+    }
+
+    // 2. Tareas config
+    if (pendingImport.files['tareas_config.csv']) {
+      addLog('📋 Importando tareas...', 'info');
+      const rows = parseCSV(pendingImport.files['tareas_config.csv']);
+      const tareasRows = rows.map(r => ({ tipo: r.TIPO, tarea: r.TAREA, minutos: +r.MINUTOS||5, orden: +r.ORDEN||1 }));
+      await fetch(GAS, { method:'POST', body: JSON.stringify({ action:'saveTareas', rows: tareasRows }) });
+      addLog('✓ Tareas importadas (' + rows.length + ' tareas)', 'ok');
+    }
+
+    // 3. Usuarios
+    if (pendingImport.files['usuarios.csv']) {
+      addLog('👥 Importando usuarios...', 'info');
+      const rows = parseCSV(pendingImport.files['usuarios.csv']);
+      const users = rows.map(r => ({ email: r.EMAIL, rol: r.ROL || 'USUARIO' }));
+      if (mode === 'merge') {
+        // Merge: add new users only
+        const existing = await fetch(GAS + '?action=getEmails').then(r=>r.json());
+        const existingEmails = existing.emails || [];
+        const newUsers = users.filter(u => !existingEmails.includes(u.email));
+        if (newUsers.length > 0) {
+          const allUsers = existingEmails.map(e => ({ email: e, rol: existing.roles[e] || 'USUARIO' }));
+          await fetch(GAS, { method:'POST', body: JSON.stringify({ action:'saveUsers', users: [...allUsers, ...newUsers] }) });
+        }
+        addLog('✓ Usuarios fusionados (' + newUsers.length + ' nuevos)', 'ok');
+      } else {
+        await fetch(GAS, { method:'POST', body: JSON.stringify({ action:'saveUsers', users }) });
+        addLog('✓ Usuarios reemplazados (' + users.length + ' usuarios)', 'ok');
+      }
+    }
+
+    // 4. Mantenimiento
+    if (pendingImport.files['mantenimiento.csv']) {
+      addLog('🔧 Importando mantenimiento...', 'info');
+      const rows = parseCSV(pendingImport.files['mantenimiento.csv']);
+      await fetch(GAS, { method:'POST', body: JSON.stringify({ action:'importMaint', rows, mode }) });
+      addLog('✓ Mantenimiento importado (' + rows.length + ' registros)', 'ok');
+    }
+
+    addLog('✅ Importación completada', 'ok');
+    toast('Importación completada ✓', 'ok');
+    pendingImport = null;
+
+  } catch(e) {
+    addLog('❌ Error: ' + e.message, 'err');
+    toast('Error en importación', 'err');
+  }
+
+  btn.disabled = false;
+  btn.textContent = '✅ Confirmar importación';
+}
+
 </script>
 </body>
 </html>

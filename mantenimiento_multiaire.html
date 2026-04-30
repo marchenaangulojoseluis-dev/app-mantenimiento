@@ -449,6 +449,7 @@ window.onload = async () => {
   const periodos = ['ENE-FEB','ENE-FEB','MAR-ABR','MAR-ABR','MAY-JUN','MAY-JUN','JUL-AGO','JUL-AGO','SEP-OCT','SEP-OCT','NOV-DIC','NOV-DIC'];
   document.getElementById('selPeriodo').value = periodos[m];
 
+  await loadTareas();
   await loadInventario();
 };
 

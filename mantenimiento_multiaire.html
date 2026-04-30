@@ -242,6 +242,97 @@ option{background:#fff}
   .toolbar{flex-wrap:wrap}
 }
 
+
+/* ── AUTH OVERLAY ─────────────────────────────────────────────────────────── */
+#auth-overlay{
+  position:fixed;inset:0;background:var(--bg);z-index:9999;
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+}
+.auth-card{
+  background:var(--surface);border:1.5px solid var(--border);border-radius:16px;
+  padding:36px 32px;max-width:400px;width:100%;text-align:center;
+  box-shadow:var(--shadow-lg);
+}
+.auth-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:28px}
+.auth-logo-dot{width:10px;height:10px;border-radius:50%;background:var(--orange)}
+.auth-logo-text{font-weight:700;font-size:20px;color:var(--blue)}
+.auth-title{font-size:15px;font-weight:700;color:var(--text);margin-bottom:6px}
+.auth-sub{font-size:12px;color:var(--muted2);margin-bottom:28px;line-height:1.5}
+.auth-btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:12px 20px;border-radius:8px;border:1.5px solid var(--border);
+  background:var(--surface);color:var(--text);font-family:var(--font);font-size:13px;
+  font-weight:600;cursor:pointer;transition:all .2s;box-shadow:var(--shadow);
+}
+.auth-btn:hover{border-color:var(--blue);background:var(--blue-pale);color:var(--blue)}
+.auth-btn img{width:18px;height:18px}
+.auth-err{
+  margin-top:16px;padding:10px 14px;background:#fdf0f2;border:1px solid #f0c0c8;
+  border-radius:8px;font-size:12px;color:var(--red);display:none;line-height:1.5;
+}
+.auth-err.show{display:block}
+.auth-loading{font-size:12px;color:var(--muted2);margin-top:12px;display:none}
+.auth-loading.show{display:block}
+
+/* ── USER PILL in header ──────────────────────────────────────────────────── */
+.user-pill{
+  display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;
+  border:1px solid rgba(255,255,255,.2);border-radius:20px;cursor:pointer;
+  transition:all .15s;
+}
+.user-pill:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.1)}
+.user-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;border:2px solid rgba(255,255,255,.3)}
+.user-avatar-placeholder{width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.user-name{font-size:11px;color:rgba(255,255,255,.85);font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+/* ── ADMIN PANEL ──────────────────────────────────────────────────────────── */
+#admin-overlay{
+  display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8000;
+  align-items:center;justify-content:center;padding:20px;
+}
+#admin-overlay.open{display:flex}
+.admin-card{
+  background:var(--surface);border:1.5px solid var(--border);border-radius:16px;
+  width:480px;max-width:95vw;max-height:85vh;overflow:hidden;
+  display:flex;flex-direction:column;box-shadow:var(--shadow-lg);
+}
+.admin-head{
+  padding:18px 22px;border-bottom:1.5px solid var(--border);
+  background:var(--blue-pale);display:flex;align-items:center;gap:10px;
+}
+.admin-head h2{font-size:14px;font-weight:700;color:var(--blue);flex:1}
+.admin-body{padding:20px 22px;overflow-y:auto;flex:1}
+.admin-section-label{font-family:var(--mono);font-size:9px;color:var(--blue);
+  text-transform:uppercase;letter-spacing:.1em;font-weight:700;margin-bottom:10px}
+.email-list{display:flex;flex-direction:column;gap:6px;margin-bottom:20px}
+.email-item{
+  display:flex;align-items:center;gap:10px;padding:8px 12px;
+  background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;
+  font-size:12px;
+}
+.email-item.admin-item{border-color:#b0e0c8;background:#f0faf5}
+.email-item-addr{flex:1;font-family:var(--mono);font-size:11px;color:var(--text)}
+.email-item-role{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px}
+.role-admin{background:var(--blue-pale);color:var(--blue);border:1px solid var(--border)}
+.role-user{background:var(--surface3);color:var(--muted2);border:1px solid var(--border)}
+.email-item-del{
+  background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;
+  padding:2px 6px;border-radius:4px;transition:all .15s;
+}
+.email-item-del:hover{color:var(--red);background:#fdf0f2}
+.add-email-row{display:flex;gap:8px;margin-bottom:6px}
+.add-email-row input{flex:1;background:var(--surface2);border:1.5px solid var(--border);
+  color:var(--text);font-family:var(--font);font-size:12px;padding:8px 10px;
+  border-radius:6px;outline:none}
+.add-email-row input:focus{border-color:var(--blue)}
+.add-email-row button{
+  padding:8px 14px;background:var(--blue);color:#fff;border:none;border-radius:6px;
+  font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .15s;
+}
+.add-email-row button:hover{background:var(--blue-light)}
+.admin-foot{padding:14px 22px;border-top:1.5px solid var(--border);display:flex;justify-content:flex-end;gap:8px}
+
 </style>
 </head>
 <body>
@@ -249,7 +340,7 @@ option{background:#fff}
 <header>
   <button class="mob-menu" onclick="toggleSidebar()">☰</button>
   <div class="logo"><div style="width:8px;height:8px;border-radius:50%;background:var(--orange);flex-shrink:0"></div>MultiAire <span>/ Mantenimiento</span></div>
-  <div class="hpill" id="connPill">⟳ Conectando...</div><a href="index.html" class="back-link">← Inicio</a>
+  <div class="hpill" id="connPill">⟳ Conectando...</div><div id="user-pill" class="user-pill" style="display:none;margin-left:8px" onclick="openAdmin()" title="Gestión de accesos"></div><a href="index.html" class="back-link">← Inicio</a>
   <div class="hactions">
     <div class="saving" id="savingInd"><div class="spin"></div> Guardando...</div>
     <button class="btn btn-sm" style="color:var(--orange);border-color:#f0c09a;background:var(--orange-pale)" onclick="exportWhatsApp()" id="btnExport" style="display:none">📤 WhatsApp</button>
@@ -809,7 +900,62 @@ function exportWhatsApp() {
   }).catch(() => {
     // Fallback: open in new window for easy copy
     const w = window.open('', '_blank', 'width=600,height=700');
-    w.document.write('<html><body style="font-family:monospace;white-space:pre-wrap;padding:20px;background:#111;color:#eee;font-size:13px">' + fullTxt.replace(/</g,'&lt;') + '</body></html>');
+    w.document.write('<html><body style="font-family:monospace;white-space:pre-wrap;padding:20px;background:#111;color:#eee;font-size:13px">' + fullTxt.replace(/</g,'&lt;') + '
+<!-- AUTH OVERLAY -->
+<div id="auth-overlay" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <div class="auth-logo-dot"></div>
+      <div class="auth-logo-text">MultiAire</div>
+    </div>
+    <div class="auth-title">Acceso restringido</div>
+    <div class="auth-sub">Inicia sesión con tu cuenta Google autorizada para continuar.</div>
+    <div id="g_id_onload"
+      data-client_id="859362309270-23def0uf0j6j70upft0u5gg4csoe97k2.apps.googleusercontent.com"
+      data-callback="handleCredentialResponse"
+      data-auto_prompt="false">
+    </div>
+    <div class="g_id_signin"
+      data-type="standard"
+      data-shape="rectangular"
+      data-theme="outline"
+      data-text="signin_with"
+      data-size="large"
+      data-locale="es"
+      data-width="336">
+    </div>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-loading" id="auth-loading"></div>
+  </div>
+</div>
+
+<!-- ADMIN OVERLAY -->
+<div id="admin-overlay" onclick="if(event.target===this)closeAdmin()">
+  <div class="admin-card">
+    <div class="admin-head">
+      <h2>⚙️ Gestión de accesos</h2>
+      <button class="btn btn-sm" onclick="closeAdmin()">✕</button>
+    </div>
+    <div class="admin-body">
+      <div class="admin-section-label">Usuarios con acceso</div>
+      <div class="email-list" id="admin-email-list">Cargando...</div>
+      <div class="admin-section-label">Agregar usuario</div>
+      <div class="add-email-row">
+        <input type="email" id="new-email-input" placeholder="correo@gmail.com" 
+          onkeydown="if(event.key==='Enter')addEmail()">
+        <button onclick="addEmail()">+ Agregar</button>
+      </div>
+    </div>
+    <div class="admin-foot">
+      <button class="btn btn-sm" style="color:var(--red);border-color:#f0c0c8" onclick="signOut()">
+        Cerrar sesión
+      </button>
+      <button class="btn btn-sm btn-primary" onclick="closeAdmin()">Cerrar</button>
+    </div>
+  </div>
+</div>
+
+</body></html>');
     w.document.close();
   });
 }

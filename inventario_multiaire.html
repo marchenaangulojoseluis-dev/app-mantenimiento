@@ -623,9 +623,10 @@ function maRenderPill(){
   var pill=document.getElementById('user-pill');
   if(!pill||!maUser)return;
   var init=maUser.name?maUser.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase():'?';
+  var displayName=maUser.name?decodeURIComponent(escape(maUser.name)):maUser.email;
   pill.innerHTML=maUser.picture
-    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+maUser.name+'"><span class="user-name">'+maUser.name+'</span>'
-    :'<div class="user-avatar-init">'+init+'</div><span class="user-name">'+maUser.name+'</span>';
+    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+displayName+'"><span class="user-name">'+displayName+'</span>'
+    :'<div class="user-avatar-init">'+init+'</div><span class="user-name">'+displayName+'</span>';
   pill.style.display='flex';
 }
 function maSignOut(){sessionStorage.removeItem('ma_user');maUser=null;location.reload();}
@@ -766,9 +767,10 @@ function maRenderPill(){
   var pill=document.getElementById('user-pill');
   if(!pill||!maUser)return;
   var init=maUser.name?maUser.name.split(' ').map(function(n){return n[0];}).join('').substring(0,2).toUpperCase():'?';
+  var displayName=maUser.name?decodeURIComponent(escape(maUser.name)):maUser.email;
   pill.innerHTML=maUser.picture
-    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+maUser.name+'"><span class="user-name">'+maUser.name+'</span>'
-    :'<div class="user-avatar-init">'+init+'</div><span class="user-name">'+maUser.name+'</span>';
+    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+displayName+'"><span class="user-name">'+displayName+'</span>'
+    :'<div class="user-avatar-init">'+init+'</div><span class="user-name">'+displayName+'</span>';
   pill.style.display='flex';
 }
 function maSignOut(){sessionStorage.removeItem('ma_user');maUser=null;location.reload();}

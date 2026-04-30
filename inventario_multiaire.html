@@ -110,11 +110,19 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
 .auth-err.show{display:block}
 .auth-loading{font-size:12px;color:#6a7a9a;margin-top:10px;display:none}
 .auth-loading.show{display:block}
-.user-pill{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid rgba(255,255,255,.2);border-radius:20px;cursor:pointer;transition:all .15s;}
+.user-pill{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid rgba(255,255,255,.2);border-radius:20px;cursor:pointer;transition:all .15s;position:relative;}
 .user-pill:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.1)}
 .user-avatar{width:26px;height:26px;border-radius:50%;object-fit:cover;}
 .user-avatar-init{width:26px;height:26px;border-radius:50%;background:#F47920;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
 .user-name{font-size:11px;color:rgba(255,255,255,.85);font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1.5px solid #d0daf0;border-radius:10px;box-shadow:0 8px 24px rgba(27,63,139,.15);min-width:180px;overflow:hidden;z-index:999;}
+.user-menu.open{display:block}
+.user-menu-item{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;color:#1a2540;cursor:pointer;transition:background .15s;white-space:nowrap;border:none;background:none;width:100%;text-align:left;font-family:var(--font,sans-serif);}
+.user-menu-item:hover{background:#f0f4fa}
+.user-menu-item.danger{color:#d63344;}
+.user-menu-item.danger:hover{background:#fdf0f2}
+.user-menu-divider{height:1px;background:#d0daf0;margin:4px 0}
+.user-menu-header{padding:10px 14px 6px;font-size:10px;color:#8a9ab8;font-weight:600;text-transform:uppercase;letter-spacing:.08em}
 #admin-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:8000;align-items:center;justify-content:center;padding:20px;}
 #admin-overlay.open{display:flex}
 .admin-card{background:#fff;border:1.5px solid #d0daf0;border-radius:16px;width:480px;max-width:95vw;max-height:85vh;overflow:hidden;display:flex;flex-direction:column;box-shadow:0 8px 32px rgba(27,63,139,.14);}
@@ -126,7 +134,12 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
 .email-item{display:flex;align-items:center;gap:8px;padding:8px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px;font-size:12px;}
 .email-item.is-admin{border-color:#b0e0c8;background:#f0faf5}
 .email-addr{flex:1;font-size:11px;color:#1a2540}
-.email-role{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;background:#e8eef8;color:#1B3F8B;border:1px solid #d0daf0}
+.email-role{font-size:9px;font-weight:700;padding:2px 7px;border-radius:4px;cursor:pointer;border:1px solid #d0daf0;transition:all .15s;}
+.role-admin{background:#e8eef8;color:#1B3F8B;}
+.role-admin:hover:not([disabled]){background:#1B3F8B;color:#fff;}
+.role-user{background:#fff3eb;color:#d4621a;}
+.role-user:hover:not([disabled]){background:#F47920;color:#fff;}
+.email-role[disabled]{cursor:not-allowed;opacity:.5;}
 .email-del{background:none;border:none;color:#8a9ab8;cursor:pointer;font-size:14px;padding:2px 6px;border-radius:4px;transition:all .15s;}
 .email-del:hover{color:#d63344;background:#fdf0f2}
 .add-row{display:flex;gap:8px;margin-bottom:6px}
@@ -602,13 +615,16 @@ function maVerify(payload,save){
   var ldEl=document.getElementById('auth-loading');
   if(ldEl){ldEl.textContent='Verificando acceso...';ldEl.classList.add('show');}
   if(errEl)errEl.classList.remove('show');
-  maGetEmails().then(function(emails){
+  maGetEmails().then(function(data){
+    var emails=data.emails||data;
+    var roles=data.roles||{};
     if(emails.indexOf(email)===-1){
       if(ldEl)ldEl.classList.remove('show');
       if(errEl){errEl.textContent='Acceso denegado para '+email+'. Contacta al administrador.';errEl.classList.add('show');}
       sessionStorage.removeItem('ma_user');return;
     }
-    maUser={email:email,name:payload.name||email,picture:payload.picture||''};
+    var rol=roles[email]||'USUARIO';
+    maUser={email:email,name:payload.name||email,picture:payload.picture||'',rol:rol};
     if(save)sessionStorage.setItem('ma_user',JSON.stringify(maUser));
     if(ldEl)ldEl.classList.remove('show');
     var ov=document.getElementById('auth-overlay');
@@ -622,8 +638,9 @@ function maVerify(payload,save){
 function maGetEmails(){
   if(maEmails)return Promise.resolve(maEmails);
   return fetch(MA_GAS+'?action=getEmails').then(function(r){return r.json();}).then(function(d){
-    maEmails=(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();});return maEmails;
-  }).catch(function(){maEmails=[MA_ADM.toLowerCase()];return maEmails;});
+    maEmails={emails:(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();}),roles:d.roles||{}};
+    return maEmails;
+  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }
 function maLogAccess(email){
   fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'logAccess',email:email,app:document.title})}).catch(function(){});
@@ -634,28 +651,59 @@ function maRenderPill(){
   var n=maUser.name||maUser.email;
   try{n=decodeURIComponent(escape(n));}catch(e){}
   var init=n.split(' ').map(function(x){return x[0];}).join('').substring(0,2).toUpperCase();
-  pill.innerHTML=maUser.picture
-    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+n+'"><span class="user-name">'+n+'</span>'
-    :'<div class="user-avatar-init">'+init+'</div><span class="user-name">'+n+'</span>';
+  var isAdmin=maUser.rol==='ADMIN';
+  var avatarHtml=maUser.picture
+    ?'<img class="user-avatar" src="'+maUser.picture+'" alt="'+n+'">'
+    :'<div class="user-avatar-init">'+init+'</div>';
+  var adminItem=isAdmin
+    ?'<button class="user-menu-item" onclick="maOpenAdminPanel()">&#9881; Gestión de accesos</button><div class="user-menu-divider"></div>'
+    :'';
+  pill.innerHTML=avatarHtml+'<span class="user-name">'+n+'</span>'
+    +'<div class="user-menu" id="user-menu">'
+    +'<div class="user-menu-header">'+maUser.email+'</div>'
+    +'<div class="user-menu-divider"></div>'
+    +adminItem
+    +'<button class="user-menu-item danger" onclick="maSignOut()">&#x2192; Cerrar sesión</button>'
+    +'</div>';
   pill.style.display='flex';
 }
 function maSignOut(){sessionStorage.removeItem('ma_user');maUser=null;location.reload();}
 function maParseJwt(t){var b=t.split('.')[1].replace(/-/g,'+').replace(/_/g,'/');return JSON.parse(atob(b));}
 function maOpenAdmin(){
-  if(!maUser||maUser.email!==MA_ADM.toLowerCase())return;
+  var menu=document.getElementById('user-menu');
+  if(menu){menu.classList.toggle('open');}
+}
+function maOpenAdminPanel(){
+  if(!maUser||maUser.rol!=='ADMIN')return;
+  document.getElementById('user-menu').classList.remove('open');
   maRenderAdmin();document.getElementById('admin-overlay').classList.add('open');
 }
+document.addEventListener('click',function(e){
+  var pill=document.getElementById('user-pill');
+  var menu=document.getElementById('user-menu');
+  if(menu&&pill&&!pill.contains(e.target))menu.classList.remove('open');
+});
 function maCloseAdmin(){document.getElementById('admin-overlay').classList.remove('open');}
 function maRenderAdmin(){
-  maGetEmails().then(function(emails){
+  maGetEmails().then(function(data){
+    var emails=data.emails||[];
+    var roles=data.roles||{};
     var list=document.getElementById('admin-email-list');
     if(!list)return;
+    var adminCount=emails.filter(function(e){return roles[e]==='ADMIN';}).length;
     list.innerHTML=emails.map(function(e){
-      var isA=e===MA_ADM.toLowerCase();
+      var rol=roles[e]||'USUARIO';
+      var isA=rol==='ADMIN';
+      var onlyAdmin=isA&&adminCount===1;
       return '<div class="email-item'+(isA?' is-admin':'')+'">'
         +'<span class="email-addr">'+e+'</span>'
-        +'<span class="email-role">'+(isA?'ADMIN':'USUARIO')+'</span>'
-        +(!isA?'<button class="email-del" onclick="maRemoveEmail(this.dataset.e)" data-e="'+e+'">&#x2715;</button>':'')
+        +'<button class="email-role '+(isA?'role-admin':'role-user')+'" '
+        +(onlyAdmin?'disabled title="Debe haber al menos un admin"':'')
+        +' onclick="maToggleRole(this.dataset.e)" data-e="'+e+'">'
+        +rol+'</button>'
+        +'<button class="email-del" onclick="maRemoveEmail(this.dataset.e)" data-e="'+e+'" '
+        +(onlyAdmin?'disabled title="No puedes eliminar el único admin"':'')
+        +'>&#x2715;</button>'
         +'</div>';
     }).join('');
   });
@@ -664,20 +712,39 @@ function maAddEmail(){
   var input=document.getElementById('new-email-input');
   var email=(input.value||'').trim().toLowerCase();
   if(!email||email.indexOf('@')===-1)return;
-  maGetEmails().then(function(emails){
+  maGetEmails().then(function(data){
+    var emails=data.emails||[];
+    var roles=data.roles||{};
     if(emails.indexOf(email)!==-1){input.value='';return Promise.resolve();}
-    emails.push(email);return maSaveEmails(emails);
+    emails.push(email);roles[email]='USUARIO';
+    var users=emails.map(function(e){return{email:e,rol:roles[e]||'USUARIO'};});
+    return maSaveUsers(users);
   }).then(function(){if(input)input.value='';maRenderAdmin();});
 }
 function maRemoveEmail(email){
-  if(email===MA_ADM.toLowerCase())return;
-  maGetEmails().then(function(emails){
-    return maSaveEmails(emails.filter(function(e){return e!==email;}));
+  maGetEmails().then(function(data){
+    var emails=data.emails||[];
+    var roles=data.roles||{};
+    var adminCount=emails.filter(function(e){return roles[e]==='ADMIN';}).length;
+    if(roles[email]==='ADMIN'&&adminCount<=1)return Promise.resolve();
+    var users=emails.filter(function(e){return e!==email;}).map(function(e){return{email:e,rol:roles[e]||'USUARIO'};});
+    return maSaveUsers(users);
   }).then(function(){maRenderAdmin();});
 }
-function maSaveEmails(emails){
-  maEmails=emails;
-  return fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'saveEmails',emails:emails})}).catch(function(){});
+function maSaveUsers(users){
+  maEmails={emails:users.map(function(u){return u.email;}),roles:Object.fromEntries(users.map(function(u){return [u.email,u.rol];}))}
+  return fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'saveUsers',users:users})}).catch(function(){});
+}
+function maToggleRole(email){
+  maGetEmails().then(function(data){
+    var emails=data.emails||[];
+    var roles=data.roles||{};
+    var adminCount=emails.filter(function(e){return roles[e]==='ADMIN';}).length;
+    if(roles[email]==='ADMIN'&&adminCount<=1)return;
+    roles[email]=roles[email]==='ADMIN'?'USUARIO':'ADMIN';
+    var users=emails.map(function(e){return{email:e,rol:roles[e]||'USUARIO'};});
+    return maSaveUsers(users);
+  }).then(function(){maRenderAdmin();});
 }
 
 </script>

@@ -513,8 +513,9 @@ async function loadInventario() {
         area: r[5], marca: r[6], modelo: r[7], serie: r[8]
       }));
 
-    // Populate sedes grouped by cliente
+    // Populate sedes grouped by cliente (clear first to avoid duplicates)
     const sel = document.getElementById('selSede');
+    sel.innerHTML = '<option value="">— Seleccionar sede —</option>';
     const byCliente = {};
     allEquipos.forEach(e => {
       const c = e.cliente || 'RIPLEY';

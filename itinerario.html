@@ -505,6 +505,10 @@ function renderItinerario(iti, bloques, fecha) {
         </div>
       </div>
       <div class="iti-actions">
+        <button class="btn" onclick="exportPNG()" title="Exportar PNG">🖼 PNG</button>
+        <button class="btn" onclick="exportPDF()" title="Exportar PDF">📄 PDF</button>
+        <button class="btn" onclick="exportWhatsApp()" title="Enviar WhatsApp">💬 WhatsApp</button>
+        <button class="btn btn-danger" onclick="openDeleteModal()" title="Eliminar">🗑 Eliminar</button>
         <button class="btn btn-primary" onclick="editarItinerario()">✏️ Editar / Nueva versión</button>
       </div>
     </div>
@@ -818,6 +822,286 @@ function closeModal() {
   window.bloquesPersonal = {};
 }
 
+
+// ── DELETE ────────────────────────────────────────────────────────────────────
+function openDeleteModal() {
+  if (!currentIti) return;
+  document.getElementById('delete-version-label').textContent = 'Eliminar versión v' + currentIti.version;
+  document.getElementById('modal-delete').classList.add('open');
+}
+
+function closeDeleteModal() {
+  document.getElementById('modal-delete').classList.remove('open');
+}
+
+async function deleteVersion() {
+  if (!currentIti) return;
+  if (!confirm('¿Eliminar la versión v' + currentIti.version + ' del itinerario ' + currentIti.id + '?')) return;
+  closeDeleteModal();
+  document.getElementById('savingInd').classList.add('show');
+  try {
+    const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({
+      action: 'deleteItinerario',
+      id: currentIti.id,
+      version: currentIti.version,
+      mode: 'version',
+      usuario: maUser?.email || 'sistema'
+    })});
+    const d = await r.json();
+    if (d.ok) {
+      toast('Versión eliminada ✓', 'ok');
+      currentIti = null;
+      document.getElementById('main-content').innerHTML = '<div class="empty-iti"><div style="font-size:48px;margin-bottom:16px">📋</div><h3>Itinerario eliminado</h3><p>Selecciona otra fecha.</p></div>';
+      const rRes = await fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json());
+      renderRecientes(rRes.itinerarios || []);
+    } else toast('Error eliminando: ' + (d.error || ''), 'err');
+  } catch(e) { toast('Error de conexión', 'err'); }
+  document.getElementById('savingInd').classList.remove('show');
+}
+
+async function deleteAllVersions() {
+  if (!currentIti) return;
+  if (!confirm('¿Eliminar TODAS las versiones del itinerario ' + currentIti.id + '? Esta acción no se puede deshacer.')) return;
+  closeDeleteModal();
+  document.getElementById('savingInd').classList.add('show');
+  try {
+    const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({
+      action: 'deleteItinerario',
+      id: currentIti.id,
+      mode: 'all',
+      usuario: maUser?.email || 'sistema'
+    })});
+    const d = await r.json();
+    if (d.ok) {
+      toast('Itinerario eliminado ✓', 'ok');
+      currentIti = null;
+      document.getElementById('main-content').innerHTML = '<div class="empty-iti"><div style="font-size:48px;margin-bottom:16px">📋</div><h3>Itinerario eliminado</h3><p>Selecciona otra fecha.</p></div>';
+      const rRes = await fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json());
+      renderRecientes(rRes.itinerarios || []);
+    } else toast('Error eliminando: ' + (d.error || ''), 'err');
+  } catch(e) { toast('Error de conexión', 'err'); }
+  document.getElementById('savingInd').classList.remove('show');
+}
+
+// ── EXPORT WHATSAPP ───────────────────────────────────────────────────────────
+function exportWhatsApp() {
+  if (!currentIti) return;
+  const fecha = document.getElementById('fecha-input').value;
+  const d = new Date(fecha + 'T12:00:00');
+  const fechaStr = d.toLocaleDateString('es-PE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' }).toUpperCase();
+
+  const main = document.getElementById('main-content');
+  const bloqueCards = main.querySelectorAll('.bloque-card');
+
+  let msg = '📋 *ITINERARIO MULTIAIRE*\n';
+  msg += '📅 ' + fechaStr + '\n';
+  msg += '🔖 ' + currentIti.id + ' · v' + currentIti.version + '\n';
+
+  if (currentIti.obsGenerales) {
+    msg += '\n📌 *ANOTACIONES GENERALES*\n' + currentIti.obsGenerales + '\n';
+  }
+
+  msg += '\n' + '─'.repeat(30) + '\n';
+
+  bloqueCards.forEach((card, i) => {
+    const tienda = card.querySelector('.bloque-tienda')?.textContent?.trim() || '';
+    const grupo = card.querySelector('.bloque-grupo')?.textContent?.trim() || '';
+    const horario = card.querySelector('.horario-badge')?.textContent?.trim().replace(/\s+/g,' ') || '';
+    const detalle = card.querySelector('.bloque-detalle')?.textContent?.trim() || '';
+    const personal = [...card.querySelectorAll('.personal-tag')].map(p => p.textContent.trim().split('(')[0].trim()).join(', ');
+    const estado = card.querySelector('.bloque-header span:last-child')?.textContent?.trim() || '';
+
+    const grupoEmoji = grupo.includes('PREVENT') ? '🔧' : grupo.includes('CORRECT') ? '⚠️' : '🚨';
+
+    msg += '\n*BLOQUE ' + (i+1) + '* ' + grupoEmoji + '\n';
+    msg += '🏪 ' + tienda + '\n';
+    msg += '⏰ ' + horario + '\n';
+    msg += '👷 ' + (personal || 'Sin asignar') + '\n';
+    if (detalle) msg += '📝 ' + detalle + '\n';
+    msg += '🔖 Estado: ' + estado + '\n';
+    msg += '─'.repeat(30) + '\n';
+  });
+
+  msg += '\n_MultiAire · Sistema de Gestión_';
+
+  const encoded = encodeURIComponent(msg);
+  window.open('https://wa.me/?text=' + encoded, '_blank');
+}
+
+// ── EXPORT PNG ────────────────────────────────────────────────────────────────
+async function exportPNG() {
+  if (!currentIti) return;
+  toast('Generando PNG...', '');
+
+  // Load html2canvas
+  if (!window.html2canvas) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const printEl = buildPrintLayout();
+  document.body.appendChild(printEl);
+
+  try {
+    const canvas = await html2canvas(printEl, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#f0f4fa',
+      width: 800,
+      windowWidth: 800
+    });
+    const link = document.createElement('a');
+    link.download = currentIti.id + '_v' + currentIti.version + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+    toast('PNG descargado ✓', 'ok');
+  } catch(e) {
+    toast('Error generando PNG', 'err');
+  }
+  document.body.removeChild(printEl);
+}
+
+// ── EXPORT PDF ────────────────────────────────────────────────────────────────
+async function exportPDF() {
+  if (!currentIti) return;
+  toast('Generando PDF...', '');
+
+  if (!window.html2canvas) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+  if (!window.jspdf) {
+    await new Promise((res, rej) => {
+      const s = document.createElement('script');
+      s.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+      s.onload = res; s.onerror = rej;
+      document.head.appendChild(s);
+    });
+  }
+
+  const printEl = buildPrintLayout();
+  document.body.appendChild(printEl);
+
+  try {
+    const canvas = await html2canvas(printEl, {
+      scale: 2, useCORS: true, backgroundColor: '#f0f4fa',
+      width: 800, windowWidth: 800
+    });
+
+    const { jsPDF } = window.jspdf;
+    const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
+    const imgW = pageW;
+    const imgH = (canvas.height * imgW) / canvas.width;
+
+    let y = 0;
+    while (y < imgH) {
+      if (y > 0) pdf.addPage();
+      pdf.addImage(canvas.toDataURL('image/png'), 'PNG', 0, -y, imgW, imgH);
+      y += pageH;
+    }
+
+    pdf.save(currentIti.id + '_v' + currentIti.version + '.pdf');
+    toast('PDF descargado ✓', 'ok');
+  } catch(e) {
+    toast('Error generando PDF', 'err');
+  }
+  document.body.removeChild(printEl);
+}
+
+// ── BUILD PRINT LAYOUT ────────────────────────────────────────────────────────
+function buildPrintLayout() {
+  const fecha = document.getElementById('fecha-input').value;
+  const d = new Date(fecha + 'T12:00:00');
+  const fechaStr = d.toLocaleDateString('es-PE', { weekday:'long', day:'2-digit', month:'long', year:'numeric' });
+  const main = document.getElementById('main-content');
+  const bloqueCards = [...main.querySelectorAll('.bloque-card')];
+
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'position:fixed;left:-9999px;top:0;width:800px;background:#f0f4fa;font-family:IBM Plex Sans,sans-serif;font-size:13px;color:#1a2540;padding:32px;box-sizing:border-box;';
+
+  // Header
+  let html = '<div style="background:#1B3F8B;border-radius:12px;padding:24px 28px;margin-bottom:20px;color:#fff">';
+  html += '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px">';
+  html += '<div style="font-weight:700;font-size:20px">MultiAire</div>';
+  html += '<div style="opacity:.5;font-size:14px">/ Itinerario</div>';
+  html += '</div>';
+  html += '<div style="font-size:16px;font-weight:700;text-transform:capitalize">' + fechaStr + '</div>';
+  html += '<div style="font-size:11px;opacity:.6;margin-top:4px;font-family:monospace">' + currentIti.id + ' · v' + currentIti.version + ' · ' + currentIti.estado + '</div>';
+  html += '</div>';
+
+  // Anotaciones generales
+  if (currentIti.obsGenerales) {
+    html += '<div style="background:#fff8ee;border:1px solid #f5d080;border-radius:8px;padding:14px 16px;margin-bottom:16px">';
+    html += '<div style="font-size:9px;font-weight:700;color:#d48a00;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px">Anotaciones generales</div>';
+    html += '<div style="font-size:12px;line-height:1.6;color:#1a2540">' + currentIti.obsGenerales + '</div>';
+    html += '</div>';
+  }
+
+  // Bloques
+  bloqueCards.forEach((card, i) => {
+    const tienda = card.querySelector('.bloque-tienda')?.textContent?.trim() || '';
+    const grupo = card.querySelector('.bloque-grupo')?.textContent?.trim() || '';
+    const horario = card.querySelector('.horario-badge')?.textContent?.trim().replace(/\s+/g,' ') || '';
+    const detalle = card.querySelector('.bloque-detalle')?.textContent?.trim() || '';
+    const personalTags = [...card.querySelectorAll('.personal-tag')];
+    const estado = card.querySelector('.bloque-header > span:last-child')?.textContent?.trim() || 'PROGRAMADO';
+
+    const grupoStyle = grupo.includes('PREVENT') ? 'background:#f0faf5;color:#1a9e5a;border:1px solid #b0e0c8'
+      : grupo.includes('CORRECT') ? 'background:#fff3eb;color:#d4621a;border:1px solid #f0c09a'
+      : 'background:#fdf0f2;color:#d63344;border:1px solid #f0c0c8';
+
+    const estadoStyle = estado === 'COMPLETADO' ? 'background:#f0faf5;color:#1a9e5a;border:1px solid #b0e0c8'
+      : estado === 'EN CURSO' ? 'background:#fff3eb;color:#d4621a;border:1px solid #f0c09a'
+      : estado === 'CANCELADO' ? 'background:#fdf0f2;color:#d63344;border:1px solid #f0c0c8'
+      : 'background:#e8eef8;color:#1B3F8B;border:1px solid #d0daf0';
+
+    html += '<div style="background:#fff;border:1.5px solid #d0daf0;border-radius:10px;margin-bottom:12px;overflow:hidden">';
+    // Bloque header
+    html += '<div style="display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid #d0daf0;background:#f5f8ff">';
+    html += '<div style="width:26px;height:26px;border-radius:50%;background:#1B3F8B;color:#fff;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0">' + (i+1) + '</div>';
+    html += '<div style="font-size:14px;font-weight:700;flex:1">' + tienda + '</div>';
+    html += '<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;' + grupoStyle + '">' + grupo + '</span>';
+    html += '<span style="font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;' + estadoStyle + '">' + estado + '</span>';
+    html += '</div>';
+    // Bloque body
+    html += '<div style="padding:12px 16px;display:grid;grid-template-columns:1fr 1fr;gap:12px">';
+    html += '<div><div style="font-size:9px;font-weight:700;color:#8a9ab8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Horario</div>';
+    html += '<div style="font-size:13px;font-weight:700;color:#1a2540">' + horario + '</div></div>';
+    html += '<div><div style="font-size:9px;font-weight:700;color:#8a9ab8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Personal</div>';
+    html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
+    personalTags.forEach(pt => {
+      const name = pt.textContent.trim();
+      html += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e8eef8;color:#1B3F8B;border:1px solid #d0daf0">' + name + '</span>';
+    });
+    if (!personalTags.length) html += '<span style="font-size:11px;color:#8a9ab8">Sin asignar</span>';
+    html += '</div></div>';
+    if (detalle) {
+      html += '<div style="grid-column:1/-1"><div style="font-size:9px;font-weight:700;color:#8a9ab8;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px">Detalle de trabajo</div>';
+      html += '<div style="font-size:12px;line-height:1.5;background:#f5f8ff;padding:8px 12px;border-radius:6px;border-left:3px solid #1B3F8B">' + detalle + '</div></div>';
+    }
+    html += '</div></div>';
+  });
+
+  // Footer
+  html += '<div style="margin-top:16px;padding-top:12px;border-top:1px solid #d0daf0;display:flex;justify-content:space-between;font-size:10px;color:#8a9ab8">';
+  html += '<span>MultiAire © 2026 · Sistema de Gestión</span>';
+  html += '<span>Generado: ' + new Date().toLocaleString('es-PE') + '</span>';
+  html += '</div>';
+
+  wrap.innerHTML = html;
+  return wrap;
+}
+
 function toast(msg, type) {
   const el = document.getElementById('toast');
   el.textContent = msg;
@@ -825,5 +1109,39 @@ function toast(msg, type) {
   setTimeout(() => el.classList.remove('show'), 3000);
 }
 </script>
+
+<!-- DELETE MODAL -->
+<div class="overlay" id="modal-delete" onclick="if(event.target===this)closeDeleteModal()">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-head" style="background:#fdf0f2">
+      <h2 style="color:var(--red)">🗑 Eliminar itinerario</h2>
+      <button class="btn btn-sm" onclick="closeDeleteModal()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="font-size:13px;color:var(--accent);line-height:1.6;margin-bottom:20px">
+        ¿Qué deseas eliminar?
+      </p>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn" onclick="deleteVersion()" style="justify-content:flex-start;gap:12px;padding:14px 16px">
+          <span style="font-size:18px">📄</span>
+          <div style="text-align:left">
+            <div style="font-weight:700;color:var(--accent)" id="delete-version-label">Eliminar esta versión</div>
+            <div style="font-size:11px;color:var(--muted2)">Solo elimina la versión actual del itinerario</div>
+          </div>
+        </button>
+        <button class="btn btn-danger" onclick="deleteAllVersions()" style="justify-content:flex-start;gap:12px;padding:14px 16px">
+          <span style="font-size:18px">🗑</span>
+          <div style="text-align:left">
+            <div style="font-weight:700">Eliminar todo el día</div>
+            <div style="font-size:11px;opacity:.8">Elimina todas las versiones de este itinerario</div>
+          </div>
+        </button>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeDeleteModal()">Cancelar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>

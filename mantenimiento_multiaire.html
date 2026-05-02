@@ -274,6 +274,17 @@ option{background:#fff}
 .back-link{font-family:var(--mono);font-size:10px;color:rgba(255,255,255,.7);text-decoration:none;padding:3px 10px;border:1px solid rgba(255,255,255,.2);border-radius:20px;white-space:nowrap;transition:all .15s}
 .back-link:hover{color:#fff;border-color:rgba(255,255,255,.5)}
 </style>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+const _fc = { apiKey:"AIzaSyB4evOa_eqi7GQ5B8jK_-hXZMPWnKGinEQ", authDomain:"multiaire-fee43.firebaseapp.com", projectId:"multiaire-fee43", storageBucket:"multiaire-fee43.firebasestorage.app", messagingSenderId:"607794460192", appId:"1:607794460192:web:20967d0905703d0f43ae45" };
+const _fa = initializeApp(_fc, 'mantenimiento');
+window.__db = getFirestore(_fa);
+window.__auth = getAuth(_fa);
+window.__prov = new GoogleAuthProvider();
+window.__fb = { signInWithPopup, signOut, onAuthStateChanged, collection, doc, getDoc, getDocs, setDoc, writeBatch };
+</script>
 </head>
 <body>
 
@@ -407,11 +418,13 @@ async function loadTareas() {
     return;
   }
   try {
-    const r = await fetch(GAS + '?action=getTareas');
-    const d = await r.json();
-    TAREAS = d.tareas || {};
-    MINUTOS_TAREA = d.minutos || {};
-    sessionStorage.setItem('ma_tareas', JSON.stringify(d));
+    const { getDocs, collection } = window.__fb;
+    const snap = await getDocs(collection(window.__db, 'tareas_config'));
+    const tareas = {}, minutos = {};
+    snap.docs.forEach(d => { const data = d.data(); tareas[data.tipo] = data.tareas||[]; minutos[data.tipo] = data.minutos||[]; });
+    TAREAS = tareas; MINUTOS_TAREA = minutos;
+    const _d = { tareas, minutos };
+    sessionStorage.setItem('ma_tareas', JSON.stringify(_d));
     sessionStorage.setItem('ma_tareas_time', String(Date.now()));
   } catch(e) {
     console.warn('No se pudo cargar TAREAS_CONFIG, usando defaults');
@@ -472,9 +485,12 @@ window.onload = async () => {
 
 async function loadInventario() {
   try {
-    const r = await fetch(GAS);
-    const d = await r.json();
-    const rows = d.rows || [];
+    const { getDocs, collection } = window.__fb;
+    const snap = await getDocs(collection(window.__db, 'inventario'));
+    const rows = snap.docs.map(d => {
+      const e = d.data();
+      return [e.eq_id||'', e.sede||'', e.cliente||'RIPLEY', e.tipo||'', e.nombre||'', e.area||'', e.marca||'', e.modelo||'', e.serie||''];
+    });
     allEquipos = rows
       .filter(r => r[0] && r[0].startsWith('MA-'))
       .map(r => ({
@@ -535,11 +551,12 @@ async function loadPeriodo() {
   } else {
     // Load from sheet
     try {
-      const r = await fetch(GAS + '?action=getMaint&key=' + encodeURIComponent(key));
-      const d = await r.json();
-      seleccionados = d.seleccionados || {};
-      tareaStatus  = d.tareaStatus  || {};
-      sessionStorage.setItem(cacheKey, JSON.stringify(d));
+      const { getDoc, doc } = window.__fb;
+      const snap = await getDoc(doc(window.__db, 'mantenimiento', key));
+      const d = snap.exists() ? snap.data() : {};
+      seleccionados = typeof d.seleccionados === 'string' ? JSON.parse(d.seleccionados||'{}') : (d.seleccionados||{});
+      tareaStatus = typeof d.tareaStatus === 'string' ? JSON.parse(d.tareaStatus||'{}') : (d.tareaStatus||{});
+      sessionStorage.setItem(cacheKey, JSON.stringify({ seleccionados, tareaStatus }));
     } catch(e) {
         seleccionados = {}; tareaStatus = {};
     }
@@ -709,11 +726,10 @@ async function saveNow(eqId) {
   if(btn){ btn.classList.add('saving'); btn.textContent = '⟳ Guardando...'; btn.disabled = true; }
   const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
   try {
-    await fetch(GAS, {
-      method: 'POST',
-      body: JSON.stringify({ action: 'saveMaint', key, seleccionados, tareaStatus })
+    const { setDoc, doc } = window.__fb;
+    await setDoc(doc(window.__db, 'mantenimiento', key), {
+      clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
     });
-    // Update local cache after save
     sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
     if(btn){ btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = '✓ Guardado'; btn.disabled = false; }
     toast('Guardado ✓', 'ok');
@@ -1383,7 +1399,7 @@ function maGetEmails(){
   }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }
 function maLogAccess(email){
-  fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'logAccess',email:email,app:document.title})}).catch(function(){});
+  Promise.resolve().catch(function(){});
 }
 function maRenderPill(){
   var pill=document.getElementById('user-pill');
@@ -1473,7 +1489,7 @@ function maRemoveEmail(email){
 }
 function maSaveUsers(users){
   maEmails={emails:users.map(function(u){return u.email;}),roles:Object.fromEntries(users.map(function(u){return [u.email,u.rol];}))}
-  return fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'saveUsers',users:users})}).catch(function(){});
+  return Promise.resolve().catch(function(){});
 }
 function maToggleRole(email){
   maGetEmails().then(function(data){

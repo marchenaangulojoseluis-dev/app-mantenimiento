@@ -186,6 +186,17 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
   .personal-grid{grid-template-columns:1fr}
 }
 </style>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, query, where, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+const _fc = { apiKey:"AIzaSyB4evOa_eqi7GQ5B8jK_-hXZMPWnKGinEQ", authDomain:"multiaire-fee43.firebaseapp.com", projectId:"multiaire-fee43", storageBucket:"multiaire-fee43.firebasestorage.app", messagingSenderId:"607794460192", appId:"1:607794460192:web:20967d0905703d0f43ae45" };
+const _fa = initializeApp(_fc, 'itinerario');
+window.__db = getFirestore(_fa);
+window.__auth = getAuth(_fa);
+window.__prov = new GoogleAuthProvider();
+window.__fb = { signInWithPopup, signOut, onAuthStateChanged, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, query, where };
+</script>
 </head>
 <body>
 
@@ -351,8 +362,13 @@ function maGetEmails() {
   if (maEmails) return Promise.resolve(maEmails);
   var ec=sessionStorage.getItem('ma_emails'),et=sessionStorage.getItem('ma_emails_time');
   if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
-  return fetch(MA_GAS + '?action=getEmails').then(r => r.json()).then(d => {
-    maEmails = { emails: (d.emails || [MA_ADM]).map(e => e.toLowerCase()), roles: d.roles || {} };
+  const {getDocs,collection}=window.__fb;
+  return getDocs(collection(window.__db,'usuarios')).then(snap=>{
+    const users=snap.docs.map(d=>d.data());
+    const emails=users.map(u=>u.email.toLowerCase());
+    const roles={};users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';});
+    if(!emails.includes(MA_ADM.toLowerCase())){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
+    maEmails={emails,roles};
     sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(() => { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
@@ -393,11 +409,20 @@ document.addEventListener('click', e => {
 async function init() {
   try {
     // Load maestros and recientes in parallel
-    const [mRes, rRes] = await Promise.all([
-      fetch(GAS + '?action=getMaestros').then(r => r.json()),
-      fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json())
+    const { getDocs, collection } = window.__fb;
+    const [pSnap, tSnap, gSnap, iSnap] = await Promise.all([
+      getDocs(collection(window.__db, 'maestros_personal')),
+      getDocs(collection(window.__db, 'maestros_tiendas')),
+      getDocs(collection(window.__db, 'maestros_grupos')),
+      getDocs(collection(window.__db, 'bd_itinerarios')),
     ]);
-    maestros = mRes;
+    maestros = {
+      personal: pSnap.docs.map(d=>d.data()).filter(p=>p.nombre),
+      tiendas: tSnap.docs.map(d=>d.data()).filter(t=>t.tienda),
+      grupos: gSnap.docs.map(d=>d.data()).filter(g=>g.grupo),
+    };
+    const rRes = { itinerarios: iSnap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,30) };
+    const mRes = maestros;
     document.getElementById('connPill').textContent = '✓ Conectado';
     document.getElementById('connPill').classList.add('ok');
     renderRecientes(rRes.itinerarios || []);
@@ -456,7 +481,17 @@ async function loadFecha(fecha) {
   const main = document.getElementById('main-content');
   main.innerHTML = '<div style="text-align:center;padding:60px;color:var(--muted)">Cargando...</div>';
   try {
-    const d = await fetch(`${GAS}?action=getItinerario&fecha=${fecha}`).then(r => r.json());
+    const { getDocs, collection, query, where } = window.__fb;
+    const iSnap = await getDocs(collection(window.__db, 'bd_itinerarios'));
+    const fd = new Date(fecha + 'T12:00:00').toDateString();
+    const matching = iSnap.docs.map(dd=>dd.data()).filter(dd=>new Date(dd.fecha).toDateString()===fd).sort((a,b)=>b.version-a.version);
+    const iti = matching[0] || null;
+    let bloques = [];
+    if (iti) {
+      const bSnap = await getDocs(collection(window.__db, 'bd_bloques'));
+      bloques = bSnap.docs.map(dd=>dd.data()).filter(dd=>dd.idIti===iti.id&&dd.version===iti.version).sort((a,b)=>a.nBloque-b.nBloque);
+    }
+    const d = { itinerario: iti, bloques };
     currentIti = d.itinerario;
     renderItinerario(d.itinerario, d.bloques || [], fecha);
   } catch(e) {
@@ -576,7 +611,17 @@ function editarItinerario() {
 }
 
 async function loadFechaForEdit(fecha, d) {
-  const res = await fetch(`${GAS}?action=getItinerario&fecha=${fecha}`).then(r => r.json());
+  const { getDocs, collection: col2 } = window.__fb;
+  const iSnap2 = await getDocs(col2(window.__db, 'bd_itinerarios'));
+  const fd2 = new Date(fecha + 'T12:00:00').toDateString();
+  const matching2 = iSnap2.docs.map(dd=>dd.data()).filter(dd=>new Date(dd.fecha).toDateString()===fd2).sort((a,b)=>b.version-a.version);
+  const iti2 = matching2[0] || null;
+  let bloques2 = [];
+  if (iti2) {
+    const bSnap2 = await getDocs(col2(window.__db, 'bd_bloques'));
+    bloques2 = bSnap2.docs.map(dd=>dd.data()).filter(dd=>dd.idIti===iti2.id&&dd.version===iti2.version).sort((a,b)=>a.nBloque-b.nBloque);
+  }
+  const res = { itinerario: iti2, bloques: bloques2 };
   const bloques = res.bloques || [];
   editBloques = bloques.length ? bloques.map(b => ({
     idTienda: b.idTienda, tienda: b.tienda, cliente: b.cliente,
@@ -780,18 +825,35 @@ async function saveItinerario() {
   document.getElementById('savingInd').classList.add('show');
 
   try {
-    const res = await fetch(GAS, { method: 'POST', body: JSON.stringify({
-      action: 'saveItinerario',
-      id: idIti, version, fecha, dia, obsGenerales, bloques,
-      estado: 'ACTUALIZADO',
-      usuario: maUser?.email || 'sistema'
-    })});
-    const d = await res.json();
+    const { writeBatch, doc, collection: col3, setDoc } = window.__fb;
+    const batch = writeBatch(window.__db);
+    batch.set(doc(window.__db, 'bd_itinerarios', idIti+'_v'+version), {
+      id:idIti, version, fecha, dia, obsGenerales, estado:'ACTUALIZADO',
+      totalBloques:bloques.length, usuario:maUser?.email||'sistema', updatedAt:new Date().toISOString()
+    });
+    bloques.forEach((b,i)=>{
+      const nBloque=i+1;
+      const bid=idIti+'_v'+version+'_b'+String(nBloque).padStart(3,'0');
+      batch.set(doc(window.__db,'bd_bloques',bid),{
+        id:bid,idIti,version,nBloque,fecha,dia,
+        idTienda:b.idTienda||'',tienda:b.tienda||'',cliente:b.cliente||'',
+        idGrupo:b.idGrupo||'',grupo:b.grupo||'',
+        horaInicio:b.horaInicio||0,horaFin:b.horaFin||0,detalle:b.detalle||'',
+        personal:b.personal||[],personal1:b.personal1||{id:'',nombre:''},
+        personal2:b.personal2||{id:'',nombre:''},personal3:b.personal3||{id:'',nombre:''},
+        personal4:b.personal4||{id:'',nombre:''},estado:b.estado||'PROGRAMADO',
+        usuario:maUser?.email||'sistema'
+      });
+    });
+    await batch.commit();
+    const d = { ok: true };
     if (d.ok) {
       toast('Itinerario guardado ✓', 'ok');
       closeModal();
       await loadFecha(fecha);
-      const rRes = await fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json());
+      const { getDocs, collection } = window.__fb;
+      const iSnap = await getDocs(collection(window.__db, 'bd_itinerarios'));
+      const rRes = { itinerarios: iSnap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,30) };
       renderRecientes(rRes.itinerarios || []);
     } else {
       toast('Error guardando: ' + (d.error || ''), 'err');
@@ -857,19 +919,21 @@ async function deleteVersion() {
   closeDeleteModal();
   document.getElementById('savingInd').classList.add('show');
   try {
-    const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({
-      action: 'deleteItinerario',
-      id: currentIti.id,
-      version: currentIti.version,
-      mode: 'version',
-      usuario: maUser?.email || 'sistema'
-    })});
-    const d = await r.json();
+    const { getDocs, collection: col4, deleteDoc, doc: doc4, writeBatch: wb4 } = window.__fb;
+    const batch4 = wb4(window.__db);
+    const iSnap4 = await getDocs(col4(window.__db,'bd_itinerarios'));
+    iSnap4.docs.filter(dd=>dd.data().id===currentIti.id&&dd.data().version===currentIti.version).forEach(dd=>batch4.delete(dd.ref));
+    const bSnap4 = await getDocs(col4(window.__db,'bd_bloques'));
+    bSnap4.docs.filter(dd=>dd.data().idIti===currentIti.id&&dd.data().version===currentIti.version).forEach(dd=>batch4.delete(dd.ref));
+    await batch4.commit();
+    const d = { ok: true };
     if (d.ok) {
       toast('Versión eliminada ✓', 'ok');
       currentIti = null;
       document.getElementById('main-content').innerHTML = '<div class="empty-iti"><div style="font-size:48px;margin-bottom:16px">📋</div><h3>Itinerario eliminado</h3><p>Selecciona otra fecha.</p></div>';
-      const rRes = await fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json());
+      const { getDocs, collection } = window.__fb;
+      const iSnap = await getDocs(collection(window.__db, 'bd_itinerarios'));
+      const rRes = { itinerarios: iSnap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,30) };
       renderRecientes(rRes.itinerarios || []);
     } else toast('Error eliminando: ' + (d.error || ''), 'err');
   } catch(e) { toast('Error de conexión', 'err'); }
@@ -882,18 +946,21 @@ async function deleteAllVersions() {
   closeDeleteModal();
   document.getElementById('savingInd').classList.add('show');
   try {
-    const r = await fetch(GAS, { method: 'POST', body: JSON.stringify({
-      action: 'deleteItinerario',
-      id: currentIti.id,
-      mode: 'all',
-      usuario: maUser?.email || 'sistema'
-    })});
-    const d = await r.json();
+    const { getDocs, collection: col5, writeBatch: wb5 } = window.__fb;
+    const batch5 = wb5(window.__db);
+    const iSnap5 = await getDocs(col5(window.__db,'bd_itinerarios'));
+    iSnap5.docs.filter(dd=>dd.data().id===currentIti.id).forEach(dd=>batch5.delete(dd.ref));
+    const bSnap5 = await getDocs(col5(window.__db,'bd_bloques'));
+    bSnap5.docs.filter(dd=>dd.data().idIti===currentIti.id).forEach(dd=>batch5.delete(dd.ref));
+    await batch5.commit();
+    const d = { ok: true };
     if (d.ok) {
       toast('Itinerario eliminado ✓', 'ok');
       currentIti = null;
       document.getElementById('main-content').innerHTML = '<div class="empty-iti"><div style="font-size:48px;margin-bottom:16px">📋</div><h3>Itinerario eliminado</h3><p>Selecciona otra fecha.</p></div>';
-      const rRes = await fetch(GAS + '?action=getItinerariosRecientes').then(r => r.json());
+      const { getDocs, collection } = window.__fb;
+      const iSnap = await getDocs(collection(window.__db, 'bd_itinerarios'));
+      const rRes = { itinerarios: iSnap.docs.map(d=>d.data()).sort((a,b)=>new Date(b.fecha)-new Date(a.fecha)).slice(0,30) };
       renderRecientes(rRes.itinerarios || []);
     } else toast('Error eliminando: ' + (d.error || ''), 'err');
   } catch(e) { toast('Error de conexión', 'err'); }

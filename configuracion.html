@@ -199,6 +199,17 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
 
 </style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+const _fc = { apiKey:"AIzaSyB4evOa_eqi7GQ5B8jK_-hXZMPWnKGinEQ", authDomain:"multiaire-fee43.firebaseapp.com", projectId:"multiaire-fee43", storageBucket:"multiaire-fee43.firebasestorage.app", messagingSenderId:"607794460192", appId:"1:607794460192:web:20967d0905703d0f43ae45" };
+const _fa = initializeApp(_fc, 'configuracion');
+window.__db = getFirestore(_fa);
+window.__auth = getAuth(_fa);
+window.__prov = new GoogleAuthProvider();
+window.__fb = { signInWithPopup, signOut, onAuthStateChanged, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch };
+</script>
 </head>
 <body>
 
@@ -429,8 +440,13 @@ function maGetEmails() {
   if (maEmails) return Promise.resolve(maEmails);
   var ec=sessionStorage.getItem('ma_emails'),et=sessionStorage.getItem('ma_emails_time');
   if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
-  return fetch(MA_GAS + '?action=getEmails').then(function(r) { return r.json(); }).then(function(d) {
-    maEmails = { emails: (d.emails || [MA_ADM]).map(function(e) { return e.toLowerCase(); }), roles: d.roles || {} };
+  const {getDocs,collection}=window.__fb;
+  return getDocs(collection(window.__db,'usuarios')).then(function(snap){
+    const users=snap.docs.map(d=>d.data());
+    const emails=users.map(u=>u.email.toLowerCase());
+    const roles={};users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';});
+    if(!emails.includes(MA_ADM.toLowerCase())){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
+    maEmails={emails,roles};
     sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(function() { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
@@ -481,8 +497,11 @@ document.addEventListener('click', function(e) {
 // ── TAREAS LOGIC ──────────────────────────────────────────────────────────────
 async function loadTareas(editable) {
   try {
-    const r = await fetch(GAS + '?action=getTareas');
-    const d = await r.json();
+    const { getDocs, collection } = window.__fb;
+    const snap = await getDocs(collection(window.__db, 'tareas_config'));
+    const _tareas = {}, _minutos = {};
+    snap.docs.forEach(dd => { const data = dd.data(); _tareas[data.tipo]=data.tareas||[]; _minutos[data.tipo]=data.minutos||[]; });
+    const d = { tareas: _tareas, minutos: _minutos };
     const tareas = d.tareas || {};
     const minutos = d.minutos || {};
 
@@ -878,7 +897,10 @@ async function confirmImport() {
         }
         addLog('✓ Usuarios fusionados (' + newUsers.length + ' nuevos)', 'ok');
       } else {
-        await fetch(GAS, { method:'POST', body: JSON.stringify({ action:'saveUsers', users }) });
+        const {writeBatch:wb,doc:wd,collection:wc,getDocs:wg}=window.__fb;
+    const wb1=wb(window.__db); const ex=await wg(wc(window.__db,'usuarios')); ex.docs.forEach(d=>wb1.delete(d.ref));
+    users.forEach(u=>wb1.set(wd(window.__db,'usuarios',u.email.toLowerCase()),{email:u.email.toLowerCase(),rol:u.rol||'USUARIO'}));
+    await wb1.commit();
         addLog('✓ Usuarios reemplazados (' + users.length + ' usuarios)', 'ok');
       }
     }
@@ -911,8 +933,17 @@ let maestrosChanged = false;
 
 async function loadMaestros() {
   try {
-    const r = await fetch(GAS + '?action=getMaestros');
-    const d = await r.json();
+    const { getDocs, collection } = window.__fb;
+    const [pSnap, tSnap, gSnap] = await Promise.all([
+      getDocs(collection(window.__db, 'maestros_personal')),
+      getDocs(collection(window.__db, 'maestros_tiendas')),
+      getDocs(collection(window.__db, 'maestros_grupos')),
+    ]);
+    const d = {
+      personal: pSnap.docs.map(dd => dd.data()),
+      tiendas: tSnap.docs.map(dd => dd.data()),
+      grupos: gSnap.docs.map(dd => dd.data()),
+    };
     // Include ALL personal/tiendas from sheet (activo or not)
     maestrosData.personal = (d.personal || []).map((p, i) => ({
       id: String(p.id || ('PER' + String(i+1).padStart(3,'0'))).trim(),
@@ -1080,20 +1111,24 @@ async function saveMaestros() {
   document.getElementById('loading').classList.add('show');
   try {
     // Save personal
-    await fetch(GAS, { method:'POST', body: JSON.stringify({
-      action: 'saveMaestros', type: 'personal',
-      rows: maestrosData.personal.map(p => ({ id:p.id, nombre:p.nombre, cargo:p.cargo, activo:p.activo, obs:'' }))
-    })});
+    const { writeBatch, doc, collection, getDocs } = window.__fb;
+    const b1 = writeBatch(window.__db);
+    const ex1 = await getDocs(collection(window.__db,'maestros_personal'));
+    ex1.docs.forEach(d=>b1.delete(d.ref));
+    maestrosData.personal.forEach(p=>{b1.set(doc(window.__db,'maestros_personal',p.id),{id:p.id,nombre:p.nombre,cargo:p.cargo,activo:p.activo,obs:''});});
+    await b1.commit();
     // Save tiendas
-    await fetch(GAS, { method:'POST', body: JSON.stringify({
-      action: 'saveMaestros', type: 'tiendas',
-      rows: maestrosData.tiendas.map(t => ({ id:t.id, cliente:t.cliente, tienda:t.tienda, sede:t.sede, activo:t.activo, obs:'' }))
-    })});
+    const b2 = writeBatch(window.__db);
+    const ex2 = await getDocs(collection(window.__db,'maestros_tiendas'));
+    ex2.docs.forEach(d=>b2.delete(d.ref));
+    maestrosData.tiendas.forEach(t=>{b2.set(doc(window.__db,'maestros_tiendas',t.id),{id:t.id,cliente:t.cliente,tienda:t.tienda,sede:t.sede,activo:t.activo,obs:''});});
+    await b2.commit();
     // Save grupos
-    await fetch(GAS, { method:'POST', body: JSON.stringify({
-      action: 'saveMaestros', type: 'grupos',
-      rows: maestrosData.grupos.map(g => ({ id:g.id, grupo:g.grupo, activo:g.activo, obs:'' }))
-    })});
+    const b3 = writeBatch(window.__db);
+    const ex3 = await getDocs(collection(window.__db,'maestros_grupos'));
+    ex3.docs.forEach(d=>b3.delete(d.ref));
+    maestrosData.grupos.forEach(g=>{b3.set(doc(window.__db,'maestros_grupos',g.id),{id:g.id,grupo:g.grupo,activo:g.activo,obs:''});});
+    await b3.commit();
     maestrosChanged = false;
     toast('Maestros guardados ✓', 'ok');
   } catch(e) {

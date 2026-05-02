@@ -152,6 +152,17 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
 .admin-foot{padding:14px 20px;border-top:1.5px solid #d0daf0;display:flex;justify-content:flex-end;gap:8px}
 
 </style>
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, query, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+const _fc = { apiKey:"AIzaSyB4evOa_eqi7GQ5B8jK_-hXZMPWnKGinEQ", authDomain:"multiaire-fee43.firebaseapp.com", projectId:"multiaire-fee43", storageBucket:"multiaire-fee43.firebasestorage.app", messagingSenderId:"607794460192", appId:"1:607794460192:web:20967d0905703d0f43ae45" };
+const _fa = initializeApp(_fc);
+window.__db = getFirestore(_fa);
+window.__auth = getAuth(_fa);
+window.__prov = new GoogleAuthProvider();
+window.__fb = { signInWithPopup, signOut, onAuthStateChanged, collection, doc, getDoc, getDocs, setDoc, deleteDoc, writeBatch, query, where };
+</script>
 </head>
 <body>
 <header>
@@ -249,17 +260,33 @@ let data=[], filtered=[], selected=new Set(), sortCol='sede', sortAsc=true, edit
 
 // ── API ───────────────────────────────────────────────────────────────────────
 async function gasGet() {
-  const r = await fetch(GAS);
-  const d = await r.json();
-  if (d.error) throw new Error(d.error);
-  return d.rows || [];
+  const { getDocs, collection } = window.__fb;
+  const snap = await getDocs(collection(window.__db, 'inventario'));
+  // Convert Firestore docs to array format matching original row structure
+  return snap.docs.map(d => {
+    const e = d.data();
+    return [e.eq_id||'', e.sede||'', e.cliente||'', e.tipo||'', e.nombre||'', e.area||'', e.marca||'', e.modelo||'', e.serie||''];
+  });
 }
 
 async function gasPost(body) {
-  const r = await fetch(GAS, {method:'POST', body: JSON.stringify(body)});
-  const d = await r.json();
-  if (!d.ok) throw new Error(d.error || 'Error en servidor');
-  return d;
+  const { setDoc, deleteDoc, doc } = window.__fb;
+  if (body.action === 'save' || body.action === 'update') {
+    const row = body.row;
+    const equipo = {
+      eq_id: row[0], sede: row[1], cliente: row[2]||'RIPLEY',
+      tipo: row[3], nombre: row[4], area: row[5],
+      marca: row[6], modelo: row[7], serie: row[8]||''
+    };
+    await setDoc(doc(window.__db, 'inventario', equipo.eq_id), equipo);
+    return { ok: true };
+  }
+  if (body.action === 'delete') {
+    const item = data.find(x => x.row === body.rowNum);
+    if (item) await deleteDoc(doc(window.__db, 'inventario', item.eq_id));
+    return { ok: true };
+  }
+  return { ok: true };
 }
 
 // ── SYNC ──────────────────────────────────────────────────────────────────────
@@ -380,7 +407,7 @@ function us(){document.getElementById('sTotal').textContent=data.length;document
 async function openNew(){
   editRow=null;
   document.getElementById('mtitle').textContent='Nuevo equipo';
-  document.getElementById('sbtn').textContent='Guardar en Sheets';
+  document.getElementById('sbtn').textContent='Guardar';
   ['sede','equipo','desc','area','marca','modelo','serie'].forEach(f=>{
     const el = document.getElementById('f_'+f);
     if(el) el.value='';
@@ -388,10 +415,13 @@ async function openNew(){
 
   try {
     // Load maestros (tiendas) + tareas (tipos) in parallel from config
-    const [mRes, tRes] = await Promise.all([
-      fetch(GAS + '?action=getMaestros').then(r => r.json()),
-      fetch(GAS + '?action=getTareas').then(r => r.json())
+    const { getDocs, collection } = window.__fb;
+    const [mSnap, tSnap] = await Promise.all([
+      getDocs(collection(window.__db, 'maestros_tiendas')),
+      getDocs(collection(window.__db, 'tareas_config'))
     ]);
+    const mRes = { tiendas: mSnap.docs.map(d => d.data()) };
+    const tRes = { tareas: Object.fromEntries(tSnap.docs.map(d => [d.data().tipo, d.data().tareas])) };
 
     // Populate sede selector from MAESTROS_TIENDAS grouped by cliente
     const formSede = document.getElementById('f_sede');
@@ -462,7 +492,7 @@ async function saveItem(){
     else{await gasPost({action:'save',row:row});toast('Equipo agregado ✓','ok');}
     cm();await sync();
   }catch(e){toast('Error: '+e.message,'err');}
-  finally{btn.disabled=false;btn.textContent=editRow?'Guardar cambios':'Guardar en Sheets';}
+  finally{btn.disabled=false;btn.textContent=editRow?'Guardar cambios':'Guardar';}
 }
 
 async function delItem(row){
@@ -837,7 +867,7 @@ function maRemoveEmail(email){
 }
 function maSaveUsers(users){
   maEmails={emails:users.map(function(u){return u.email;}),roles:Object.fromEntries(users.map(function(u){return [u.email,u.rol];}))}
-  return fetch(MA_GAS,{method:'POST',body:JSON.stringify({action:'saveUsers',users:users})}).catch(function(){});
+  return (async()=>{ const {setDoc,doc,getDocs,collection,deleteDoc,writeBatch}=window.__fb; const b=writeBatch(window.__db); const ex=await getDocs(collection(window.__db,'usuarios')); ex.docs.forEach(d=>b.delete(d.ref)); users.forEach(u=>b.set(doc(window.__db,'usuarios',u.email.toLowerCase()),{email:u.email.toLowerCase(),rol:u.rol||'USUARIO'})); await b.commit(); })().catch(function(){});
 }
 function maToggleRole(email){
   maGetEmails().then(function(data){

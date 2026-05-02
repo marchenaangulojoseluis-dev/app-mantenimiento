@@ -169,11 +169,7 @@ option{background:#fff}
 .marcar-btn:hover{border-color:var(--border2)}
 .marcar-btn.done{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
 .marcar-btn input{width:16px;height:16px;accent-color:var(--green);cursor:pointer}
-.save-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.05em;white-space:nowrap;flex-shrink:0}
-.save-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
-.save-btn.saved{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
-.save-btn.saving{border-color:var(--yellow-border);color:var(--yellow);background:var(--yellow-bg)}
-.tareas-footer{display:flex;justify-content:flex-end;margin-top:6px;margin-left:36px}
+
 
 /* MODAL selección equipos */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
@@ -680,7 +676,7 @@ function renderEquipo(eq, tareas) {
         <span class="tarea-label">${t}</span>
         ${peso}
       </label>`;
-    }).join('') + `</div><div class="tareas-footer"><button class="save-btn" id="savebtn-${eq.eq_id}" onclick="saveNow('${eq.eq_id}')">💾 GUARDAR</button></div>`;
+    }).join('') + `</div>`;
   }
 
   const pct = getPct(eq);
@@ -729,6 +725,7 @@ function toggleSoloMarcar(eqId, checked) {
   markDirty(eqId);
   renderMain();
   updateStats();
+  scheduleSave();
 }
 
 function toggleTarea(eqId, idx, checked) {
@@ -737,32 +734,14 @@ function toggleTarea(eqId, idx, checked) {
   markDirty(eqId);
   renderMain();
   updateStats();
+  scheduleSave();
 }
 
 function markDirty(eqId) {
   // visual feedback handled by renderMain re-render
 }
 
-async function saveNow(eqId) {
-  const btn = document.getElementById('savebtn-' + eqId);
-  if(btn){ btn.classList.add('saving'); btn.textContent = '⟳ Guardando...'; btn.disabled = true; }
-  const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
-  try {
-    const { setDoc, doc } = window.__fb;
-    await setDoc(doc(window.__db, 'mantenimiento', key), {
-      clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
-    });
-    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
-    if(btn){ btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = '✓ Guardado'; btn.disabled = false; }
-    toast('Guardado ✓', 'ok');
-    setTimeout(() => {
-      if(btn){ btn.classList.remove('saved'); btn.textContent = '💾 GUARDAR'; }
-    }, 2000);
-  } catch(e) {
-    if(btn){ btn.classList.remove('saving'); btn.textContent = '💾 GUARDAR'; btn.disabled = false; }
-    toast('Error al guardar', 'err');
-  }
-}
+
 
 function refreshEquipoCard(eqId) {
   const eq = sedeEquipos.find(e => e.eq_id === eqId);
@@ -803,9 +782,23 @@ async function doSave() {
     await setDoc(doc(window.__db, 'mantenimiento', key), {
       clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
     });
-    toast('Guardado ✓', 'ok');
+    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
+    toast('☁️ Guardado automáticamente', 'ok');
   } catch(e) {
-    toast('Error al guardar', 'err');
+    toast('⚠️ Error al guardar — reintentando...', 'err');
+    // Retry once after 2s
+    setTimeout(async () => {
+      try {
+        const { setDoc, doc } = window.__fb;
+        await setDoc(doc(window.__db, 'mantenimiento', key), {
+          clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
+        });
+        sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
+        toast('☁️ Guardado automáticamente', 'ok');
+      } catch(e2) {
+        toast('✗ Sin conexión — los cambios podrían perderse', 'err');
+      }
+    }, 2000);
   }
   document.getElementById('savingInd').classList.remove('show');
 }

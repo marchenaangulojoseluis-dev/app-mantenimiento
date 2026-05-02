@@ -385,13 +385,41 @@ async function openNew(){
     const el = document.getElementById('f_'+f);
     if(el) el.value='';
   });
-  // Load tipos from TAREAS_CONFIG to populate tipo selector
-  const formTipo = document.getElementById('f_equipo');
-  if (formTipo) {
-    try {
-      const r = await fetch(GAS + '?action=getTareas');
-      const d = await r.json();
-      const tiposConf = Object.keys(d.tareas || {}).sort();
+
+  try {
+    // Load maestros (tiendas) + tareas (tipos) in parallel from config
+    const [mRes, tRes] = await Promise.all([
+      fetch(GAS + '?action=getMaestros').then(r => r.json()),
+      fetch(GAS + '?action=getTareas').then(r => r.json())
+    ]);
+
+    // Populate sede selector from MAESTROS_TIENDAS grouped by cliente
+    const formSede = document.getElementById('f_sede');
+    if (formSede) {
+      const tiendas = (mRes.tiendas || []).filter(t => String(t.activo).trim().toUpperCase() !== 'NO');
+      const byCliente = {};
+      tiendas.forEach(t => {
+        const c = t.cliente || 'RIPLEY';
+        if (!byCliente[c]) byCliente[c] = [];
+        byCliente[c].push(t.sede);
+      });
+      formSede.innerHTML = '<option value="">Seleccionar sede...</option>';
+      Object.keys(byCliente).sort().forEach(cliente => {
+        const grp = document.createElement('optgroup');
+        grp.label = cliente;
+        [...new Set(byCliente[cliente])].sort().forEach(sede => {
+          const o = document.createElement('option');
+          o.value = sede; o.textContent = sede;
+          grp.appendChild(o);
+        });
+        formSede.appendChild(grp);
+      });
+    }
+
+    // Populate tipo selector from TAREAS_CONFIG + existing data
+    const formTipo = document.getElementById('f_equipo');
+    if (formTipo) {
+      const tiposConf = Object.keys(tRes.tareas || {}).sort();
       const tiposData = [...new Set(data.map(x=>x.equipo).filter(Boolean))].sort();
       const todosTipos = [...new Set([...tiposData, ...tiposConf])].sort();
       formTipo.innerHTML = '<option value="">Seleccionar tipo...</option>';
@@ -400,10 +428,11 @@ async function openNew(){
         o.value = t; o.textContent = t;
         formTipo.appendChild(o);
       });
-    } catch(e) {
-      // fallback: just use existing tipos from data
     }
+  } catch(e) {
+    // fallback: already populated from pf() on load
   }
+
   document.getElementById('mov').classList.add('open');
 }
 function editItem(row){const r=data.find(x=>x.row===row);if(!r)return;editRow=row;document.getElementById('mtitle').textContent='Editar equipo';document.getElementById('sbtn').textContent='Guardar cambios';document.getElementById('f_sede').value=r.sede;document.getElementById('f_equipo').value=r.equipo;document.getElementById('f_desc').value=r.descripcion;document.getElementById('f_area').value=r.area;document.getElementById('f_marca').value=r.marca;document.getElementById('f_modelo').value=r.modelo;document.getElementById('f_serie').value=r.serie;document.getElementById('mov').classList.add('open');}

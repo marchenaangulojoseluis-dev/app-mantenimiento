@@ -201,8 +201,8 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
   <div class="modal">
     <h2 id="mtitle">Nuevo equipo</h2>
     <div class="fg2">
-      <div class="fgg"><label>Sede *</label><input type="text" id="f_sede" list="dl_sede" placeholder="Ej: ATOCONGO"><datalist id="dl_sede"></datalist></div>
-      <div class="fgg"><label>Tipo *</label><input type="text" id="f_equipo" list="dl_equipo" placeholder="Ej: FAN COIL"><datalist id="dl_equipo"></datalist></div>
+      <div class="fgg"><label>Sede *</label><select id="f_sede"><option value="">Seleccionar sede...</option></select></div>
+      <div class="fgg"><label>Tipo *</label><select id="f_equipo"><option value="">Seleccionar tipo...</option></select></div>
       <div class="fgg full"><label>Descripción *</label><input type="text" id="f_desc" placeholder="Ej: AA Fan Coil 16"></div>
       <div class="fgg full"><label>Área / Ubicación</label><input type="text" id="f_area" placeholder="Ej: Almacén, Azotea..."></div>
       <div class="fgg"><label>Marca</label><input type="text" id="f_marca" list="dl_marca" placeholder="Ej: Midea"><datalist id="dl_marca"></datalist></div>
@@ -288,17 +288,18 @@ function setPill(t,m){const el=document.getElementById('pill');el.className='pil
 // ── FILTERS ───────────────────────────────────────────────────────────────────
 function pf() {
   const u = f => [...new Set(data.map(r=>r[f]).filter(Boolean))].sort();
-  // Build grouped sede options: Cliente > Sede
-  const sedeSelect = document.getElementById('fSede');
-  if (sedeSelect) {
-    sedeSelect.innerHTML = '<option value="">Todas las sedes</option>';
-    // Group by cliente
-    const byCliente = {};
-    data.forEach(r => {
-      const c = r.cliente || 'RIPLEY';
-      if (!byCliente[c]) byCliente[c] = new Set();
-      if (r.sede) byCliente[c].add(r.sede);
-    });
+
+  // Build grouped sede options by cliente — for filter AND form
+  const byCliente = {};
+  data.forEach(r => {
+    const c = r.cliente || 'RIPLEY';
+    if (!byCliente[c]) byCliente[c] = new Set();
+    if (r.sede) byCliente[c].add(r.sede);
+  });
+
+  function buildSedeSelect(el, firstLabel) {
+    if (!el) return;
+    el.innerHTML = '<option value="">' + firstLabel + '</option>';
     Object.keys(byCliente).sort().forEach(cliente => {
       const grp = document.createElement('optgroup');
       grp.label = cliente;
@@ -307,13 +308,31 @@ function pf() {
         opt.value = sede; opt.textContent = sede;
         grp.appendChild(opt);
       });
-      sedeSelect.appendChild(grp);
+      el.appendChild(grp);
     });
   }
-  fs('fEquipo',u('equipo'),'Todos los tipos');
+
+  buildSedeSelect(document.getElementById('fSede'), 'Todas las sedes');
+  buildSedeSelect(document.getElementById('f_sede'), 'Seleccionar sede...');
+
+  // Tipo — filter select + form select (from existing data + TAREAS config)
+  fs('fEquipo', u('equipo'), 'Todos los tipos');
+  const formTipo = document.getElementById('f_equipo');
+  if (formTipo) {
+    const tiposData = u('equipo');
+    const tiposConf = Object.keys(TAREAS || {});
+    const todosTipos = [...new Set([...tiposData, ...tiposConf])].sort();
+    formTipo.innerHTML = '<option value="">Seleccionar tipo...</option>';
+    todosTipos.forEach(t => {
+      const o = document.createElement('option');
+      o.value = t; o.textContent = t;
+      formTipo.appendChild(o);
+    });
+  }
+
   fs('fArea',u('area'),'Todas las áreas'); fs('fMarca',u('marca'),'Todas las marcas');
   fs('ebSede',u('sede'),'Por sede...'); fs('ebTipo',u('equipo'),'Por tipo...');
-  dl('dl_sede',u('sede')); dl('dl_equipo',u('equipo')); dl('dl_marca',u('marca'));
+  dl('dl_marca',u('marca'));
 }
 function fs(id,arr,ph){const el=document.getElementById(id),cur=el.value;el.innerHTML='<option value="">'+ph+'</option>'+arr.map(v=>'<option value="'+esc(v)+'"'+(v===cur?' selected':'')+'>'+esc(v)+'</option>').join('');}
 function dl(id,arr){document.getElementById(id).innerHTML=arr.map(v=>'<option value="'+esc(v)+'">').join('');}

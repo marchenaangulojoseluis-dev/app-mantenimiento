@@ -683,6 +683,8 @@ function renderModal(fecha, d, iti) {
     });
   }, 50);
 
+  const saveBtnEl = document.querySelector('#modal-iti .modal-foot .btn-primary');
+  if (saveBtnEl) { saveBtnEl.disabled = false; saveBtnEl.textContent = '💾 Guardar itinerario'; }
   document.getElementById('modal-iti').classList.add('open');
 }
 

@@ -422,7 +422,7 @@ function renderRecientes(itinerarios) {
 }
 
 function excelDateToDate(excelDate) {
-  if (excelDate instanceof Date || !isNaN(new Date(excelDate).getTime()) && String(excelDate).includes('-')) {
+  if (excelDate instanceof Date || (!isNaN(new Date(excelDate).getTime()) && String(excelDate).includes('-'))) {
     return new Date(excelDate);
   }
   // Excel serial number
@@ -658,6 +658,30 @@ function renderModal(fecha, d, iti) {
     return html;
   }
 
+  // Render all bloques
+  document.getElementById('modal-body').innerHTML =
+    '<div style="margin-bottom:16px">'
+    + '<div class="form-label" style="margin-bottom:5px">Anotaciones generales (opcional)</div>'
+    + '<textarea class="form-textarea" id="obs-generales" placeholder="Indicaciones generales para el día...">' + (iti && iti.obsGenerales ? iti.obsGenerales : '') + '</textarea>'
+    + '</div>'
+    + '<div class="bloque-sep">Bloques de trabajo</div>'
+    + '<div id="bloques-forms">' + editBloques.map(function(b, i) { return bloqueFormHtml(b, i); }).join('') + '</div>'
+    + '<button class="btn btn-orange" onclick="addBloque()" style="width:100%;margin-top:4px">+ Agregar bloque</button>'
+    + '<input type="hidden" id="modal-fecha" value="' + fecha + '">'
+    + '<input type="hidden" id="modal-version" value="' + version + '">'
+    + '<input type="hidden" id="modal-id-iti" value="' + idIti + '">'
+    + '<input type="hidden" id="modal-dia" value="' + diaStr + '">';
+
+  // Set existing values after render
+  setTimeout(() => {
+    editBloques.forEach((b, i) => {
+      if (b.idTienda) { const sel = document.getElementById('bf-tienda-' + i); if(sel) sel.value = b.idTienda; }
+      if (b.idGrupo)  { const sel = document.getElementById('bf-grupo-' + i);  if(sel) sel.value = b.idGrupo; }
+    });
+  }, 50);
+
+  document.getElementById('modal-iti').classList.add('open');
+}
 
 function addBloque() {
   const i = editBloques.length;

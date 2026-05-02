@@ -349,8 +349,11 @@ function maVerify(payload, save) {
 
 function maGetEmails() {
   if (maEmails) return Promise.resolve(maEmails);
+  var ec=sessionStorage.getItem('ma_emails'),et=sessionStorage.getItem('ma_emails_time');
+  if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
   return fetch(MA_GAS + '?action=getEmails').then(r => r.json()).then(d => {
     maEmails = { emails: (d.emails || [MA_ADM]).map(e => e.toLowerCase()), roles: d.roles || {} };
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(() => { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
 }
@@ -604,7 +607,21 @@ function renderModal(fecha, d, iti) {
   const idIti = iti ? iti.id : `ITI-${fecha.replace(/-/g,'')}-001`;
   document.getElementById('modal-title').textContent = iti ? `Nueva versión (v${version}) — ${diaStr}` : `Nuevo itinerario — ${diaStr}`;
 
-  const tiendaOpts = maestros.tiendas.map(t => `<option value="${t.id}" data-tienda="${t.tienda}" data-cliente="${t.cliente}">${t.tienda}</option>`).join('');
+  // Build tienda options grouped by cliente
+    const byClienteT = {};
+    maestros.tiendas.forEach(t => {
+      const c = t.cliente || 'RIPLEY';
+      if (!byClienteT[c]) byClienteT[c] = [];
+      byClienteT[c].push(t);
+    });
+    let tiendaOpts = '';
+    Object.keys(byClienteT).sort().forEach(cliente => {
+      tiendaOpts += '<optgroup label="' + cliente + '">';
+      byClienteT[cliente].forEach(t => {
+        tiendaOpts += '<option value="' + t.id + '">' + t.tienda + '</option>';
+      });
+      tiendaOpts += '</optgroup>';
+    });
   const grupoOpts = maestros.grupos.map(g => `<option value="${g.id}" data-grupo="${g.grupo}">${g.grupo}</option>`).join('');
   const perOpts = '<option value="">— Sin asignar —</option>' + maestros.personal.map(p => `<option value="${p.id}">${p.nombre} (${p.cargo})</option>`).join('');
 

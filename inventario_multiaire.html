@@ -52,7 +52,7 @@ thead th{position:sticky;top:0;background:#e8eef8;border-bottom:1.5px solid #d0d
 thead th:hover{color:var(--accent)}
 tbody tr{border-bottom:1px solid #1e1e1e;cursor:pointer;transition:background .1s}
 tbody tr:hover{background:#e8eef8}
-tbody tr.sel{background:#dde8f8}
+tbody tr.sel{background:var(--blue-pale)}
 td{padding:7px 10px;font-size:12px;white-space:nowrap;max-width:200px;overflow:hidden;text-overflow:ellipsis}
 td.mono{font-family:var(--mono);font-size:11px;color:var(--muted2)}
 .badge{display:inline-block;padding:2px 6px;border-radius:3px;font-size:10px;font-weight:600;font-family:var(--mono);background:var(--surface3);color:var(--muted2)}
@@ -65,7 +65,7 @@ td.mono{font-family:var(--mono);font-size:11px;color:var(--muted2)}
 .btn-e{color:var(--yellow);border-color:#443322}.btn-e:hover{background:#2a1f11;border-color:var(--yellow)}
 .btn-sm{padding:4px 8px;font-size:11px}
 .btn-bl{width:100%;justify-content:center}
-.selbar{display:none;padding:8px 16px;background:#1a2030;border-bottom:1px solid #2a3555;align-items:center;gap:10px;font-size:12px}
+.selbar{display:none;padding:8px 16px;background:var(--blue-pale);border-bottom:1.5px solid var(--border);align-items:center;gap:10px;font-size:12px}
 .selbar.on{display:flex}
 .selcnt{font-family:var(--mono);color:var(--blue)}
 input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
@@ -174,7 +174,7 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
     <div class="sa">
       <div class="sec" style="padding:0 0 6px">Acciones</div>
       <button class="btn btn-p btn-bl" onclick="openNew()">+ Nuevo equipo</button>
-      <button class="btn btn-bl" style="color:#7c5cfc;border-color:#3a2a6a;background:#1a1228" onclick="exportPDF()">📄 Exportar PDF</button>
+      <button class="btn btn-bl" style="color:#7c5cfc;border-color:#3a2a6a;background:var(--orange-pale)" onclick="exportPDF()">📄 Exportar PDF</button>
       <button class="btn btn-e btn-bl" onclick="openExport()">⬇ Exportar etiquetas</button>
       <button class="btn btn-g btn-bl" onclick="sync()">↻ Sincronizar Sheets</button>
     </div>
@@ -270,8 +270,8 @@ async function sync() {
     data = rows
       .filter(r => r[1] || r[3])
       .map((r,i) => ({
-        row:i+2, eq_id:r[0]||'', sede:r[1]||'', equipo:r[2]||'', descripcion:r[3]||'',
-        area:r[4]||'', marca:r[5]||'', modelo:r[6]||'', serie:r[7]||''
+        row:i+2, eq_id:r[0]||'', sede:r[1]||'', cliente:r[2]||'', equipo:r[3]||'', descripcion:r[4]||'',
+        area:r[5]||'', marca:r[6]||'', modelo:r[7]||'', serie:r[8]||''
       }));
     setPill('ok', '✓ ' + data.length + ' equipos');
     pf(); af(); us();
@@ -288,7 +288,29 @@ function setPill(t,m){const el=document.getElementById('pill');el.className='pil
 // ── FILTERS ───────────────────────────────────────────────────────────────────
 function pf() {
   const u = f => [...new Set(data.map(r=>r[f]).filter(Boolean))].sort();
-  fs('fSede',u('sede'),'Todas las sedes'); fs('fEquipo',u('equipo'),'Todos los tipos');
+  // Build grouped sede options: Cliente > Sede
+  const sedeSelect = document.getElementById('fSede');
+  if (sedeSelect) {
+    sedeSelect.innerHTML = '<option value="">Todas las sedes</option>';
+    // Group by cliente
+    const byCliente = {};
+    data.forEach(r => {
+      const c = r.cliente || 'RIPLEY';
+      if (!byCliente[c]) byCliente[c] = new Set();
+      if (r.sede) byCliente[c].add(r.sede);
+    });
+    Object.keys(byCliente).sort().forEach(cliente => {
+      const grp = document.createElement('optgroup');
+      grp.label = cliente;
+      [...byCliente[cliente]].sort().forEach(sede => {
+        const opt = document.createElement('option');
+        opt.value = sede; opt.textContent = sede;
+        grp.appendChild(opt);
+      });
+      sedeSelect.appendChild(grp);
+    });
+  }
+  fs('fEquipo',u('equipo'),'Todos los tipos');
   fs('fArea',u('area'),'Todas las áreas'); fs('fMarca',u('marca'),'Todas las marcas');
   fs('ebSede',u('sede'),'Por sede...'); fs('ebTipo',u('equipo'),'Por tipo...');
   dl('dl_sede',u('sede')); dl('dl_equipo',u('equipo')); dl('dl_marca',u('marca'));
@@ -360,7 +382,7 @@ async function saveItem(){
   } else {
     eq_id=data.find(x=>x.row===editRow)?.eq_id||'';
   }
-  const row=[eq_id,sede,document.getElementById('f_equipo').value.trim(),desc,document.getElementById('f_area').value.trim(),document.getElementById('f_marca').value.trim(),document.getElementById('f_modelo').value.trim(),document.getElementById('f_serie').value.trim()];
+  const cliente_val='RIPLEY';const row=[eq_id,sede,cliente_val,document.getElementById('f_equipo').value.trim(),desc,document.getElementById('f_area').value.trim(),document.getElementById('f_marca').value.trim(),document.getElementById('f_modelo').value.trim(),document.getElementById('f_serie').value.trim()];
   try{
     if(editRow!==null){await gasPost({action:'update',rowNum:editRow,row:row});toast('Equipo actualizado ✓','ok');}
     else{await gasPost({action:'save',row:row});toast('Equipo agregado ✓','ok');}
@@ -407,7 +429,7 @@ function drawLabel(ctx,r){
   const sede=(r.sede||'').toUpperCase(),desc=(r.descripcion||'').toUpperCase(),area=(r.area||'').toUpperCase();
   const modelo=r.modelo||'-',serie=r.serie||'-',marca=(r.marca||'').toUpperCase()||'-',equipo=(r.equipo||'').toUpperCase();
   ctx.fillStyle='#000';ctx.fillRect(0,0,W,HH);
-  ctx.fillStyle='#fff';ctx.font='bold 22px Arial';ctx.textAlign='center';ctx.fillText('RIPLEY',W/2,HH-10);
+  ctx.fillStyle='#fff';ctx.font='bold 22px Arial';ctx.textAlign='center';ctx.fillText((r.cliente||r.sede||'').toUpperCase(),W/2,HH-10);
   ctx.fillStyle='#000';ctx.textAlign='center';
   const dL=fitT(ctx,desc,W-2*MX,30,true),dLH=34,dTH=dL.length*dLH+(dL.length-1)*8;
   let dy=HH+(DH-dTH)/2+24;dL.forEach(l=>{ctx.font='bold 30px Arial';ctx.fillText(l,W/2,dy);dy+=dLH+8;});
@@ -640,8 +662,13 @@ function maVerify(payload,save){
 }
 function maGetEmails(){
   if(maEmails)return Promise.resolve(maEmails);
+  var ec=sessionStorage.getItem('ma_emails');
+  var et=sessionStorage.getItem('ma_emails_time');
+  if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
   return fetch(MA_GAS+'?action=getEmails').then(function(r){return r.json();}).then(function(d){
     maEmails={emails:(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();}),roles:d.roles||{}};
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));
+    sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }

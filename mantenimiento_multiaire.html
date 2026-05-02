@@ -393,11 +393,22 @@ let TAREAS = {};
 let MINUTOS_TAREA = {};  // minutos reales por tipo/tarea
 
 async function loadTareas() {
+  // Check cache first (valid for 30 minutes)
+  const cached = sessionStorage.getItem('ma_tareas');
+  const cachedTime = sessionStorage.getItem('ma_tareas_time');
+  if (cached && cachedTime && (Date.now() - parseInt(cachedTime)) < 30 * 60 * 1000) {
+    const d = JSON.parse(cached);
+    TAREAS = d.tareas || {};
+    MINUTOS_TAREA = d.minutos || {};
+    return;
+  }
   try {
     const r = await fetch(GAS + '?action=getTareas');
     const d = await r.json();
     TAREAS = d.tareas || {};
     MINUTOS_TAREA = d.minutos || {};
+    sessionStorage.setItem('ma_tareas', JSON.stringify(d));
+    sessionStorage.setItem('ma_tareas_time', String(Date.now()));
   } catch(e) {
     console.warn('No se pudo cargar TAREAS_CONFIG, usando defaults');
     TAREAS = {
@@ -451,8 +462,8 @@ window.onload = async () => {
   const periodos = ['ENE-FEB','ENE-FEB','MAR-ABR','MAR-ABR','MAY-JUN','MAY-JUN','JUL-AGO','JUL-AGO','SEP-OCT','SEP-OCT','NOV-DIC','NOV-DIC'];
   document.getElementById('selPeriodo').value = periodos[m];
 
-  await loadTareas();
-  await loadInventario();
+  // Run tareas and inventario in parallel for faster load
+  await Promise.all([loadTareas(), loadInventario()]);
 };
 
 async function loadInventario() {
@@ -463,16 +474,27 @@ async function loadInventario() {
     allEquipos = rows
       .filter(r => r[0] && r[0].startsWith('MA-'))
       .map(r => ({
-        eq_id: r[0], sede: r[1], tipo: r[2], nombre: r[3],
-        area: r[4], marca: r[5], modelo: r[6], serie: r[7]
+        eq_id: r[0], sede: r[1], cliente: r[2], tipo: r[3], nombre: r[4],
+        area: r[5], marca: r[6], modelo: r[7], serie: r[8]
       }));
 
-    // Populate sedes
-    const sedes = [...new Set(allEquipos.map(e => e.sede))].sort();
+    // Populate sedes grouped by cliente
     const sel = document.getElementById('selSede');
-    sedes.forEach(s => {
-      const o = document.createElement('option'); o.value = s; o.textContent = s;
-      sel.appendChild(o);
+    const byCliente = {};
+    allEquipos.forEach(e => {
+      const c = e.cliente || 'RIPLEY';
+      if (!byCliente[c]) byCliente[c] = new Set();
+      if (e.sede) byCliente[c].add(e.sede);
+    });
+    Object.keys(byCliente).sort().forEach(cliente => {
+      const grp = document.createElement('optgroup');
+      grp.label = cliente;
+      [...byCliente[cliente]].sort().forEach(s => {
+        const o = document.createElement('option');
+        o.value = s; o.textContent = s;
+        grp.appendChild(o);
+      });
+      sel.appendChild(grp);
     });
 
     setPill('ok', '✓ Conectado · ' + allEquipos.length + ' equipos');
@@ -498,12 +520,23 @@ async function loadPeriodo() {
   currentAnio = document.getElementById('selAnio').value;
   const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
 
+  // Check local cache first
+  const cacheKey = 'ma_maint_' + key;
+  const localCache = sessionStorage.getItem(cacheKey);
+  if (localCache) {
+    const d = JSON.parse(localCache);
+    seleccionados = d.seleccionados || {};
+    tareaStatus  = d.tareaStatus  || {};
+    renderChecklist();
+    return;
+  }
   // Load from sheet
   try {
     const r = await fetch(GAS + '?action=getMaint&key=' + encodeURIComponent(key));
     const d = await r.json();
     seleccionados = d.seleccionados || {};
     tareaStatus  = d.tareaStatus  || {};
+    sessionStorage.setItem(cacheKey, JSON.stringify(d));
   } catch(e) {
     seleccionados = {}; tareaStatus = {};
   }
@@ -676,6 +709,8 @@ async function saveNow(eqId) {
       method: 'POST',
       body: JSON.stringify({ action: 'saveMaint', key, seleccionados, tareaStatus })
     });
+    // Update local cache after save
+    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
     if(btn){ btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = '✓ Guardado'; btn.disabled = false; }
     toast('Guardado ✓', 'ok');
     setTimeout(() => {
@@ -1329,8 +1364,13 @@ function maVerify(payload,save){
 }
 function maGetEmails(){
   if(maEmails)return Promise.resolve(maEmails);
+  var ec=sessionStorage.getItem('ma_emails');
+  var et=sessionStorage.getItem('ma_emails_time');
+  if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
   return fetch(MA_GAS+'?action=getEmails').then(function(r){return r.json();}).then(function(d){
     maEmails={emails:(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();}),roles:d.roles||{}};
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));
+    sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }

@@ -204,7 +204,23 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
 
 <header>
   <div class="logo"><div class="logo-dot"></div>MultiAire <span>/ Configuración</span></div>
-  <div style="flex:1"></div><div id="user-pill" class="user-pill" style="display:none;color:var(--muted);margin-left:auto">Cargando tipos...</div>
+  <div style="flex:1"></div>
+  <div id="user-pill" class="user-pill" style="display:none" onclick="maOpenAdmin()"></div>
+  <a href="index.html" class="back-link">← Inicio</a>
+</header>
+
+<main>
+  <div class="page-title">⚙️ Configuración de tareas</div>
+  <div class="page-sub">Gestiona las tareas de mantenimiento por tipo de equipo. Solo administradores pueden modificar.</div>
+
+  <div class="section">
+    <div class="section-head">
+      <h2>📋 Tareas por tipo de equipo</h2>
+      <button class="btn btn-primary" onclick="saveTareas()" id="save-btn">💾 Guardar cambios</button>
+    </div>
+    <div class="section-body">
+      <div class="tipo-tabs" id="tipo-tabs">
+        <div style="font-size:12px;color:var(--muted)">Cargando tipos...</div>
       </div>
       <div id="tareas-panel">
         <div class="empty-tipo">Selecciona un tipo de equipo</div>
@@ -411,8 +427,11 @@ function maVerify(payload, save) {
 
 function maGetEmails() {
   if (maEmails) return Promise.resolve(maEmails);
+  var ec=sessionStorage.getItem('ma_emails'),et=sessionStorage.getItem('ma_emails_time');
+  if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
   return fetch(MA_GAS + '?action=getEmails').then(function(r) { return r.json(); }).then(function(d) {
     maEmails = { emails: (d.emails || [MA_ADM]).map(function(e) { return e.toLowerCase(); }), roles: d.roles || {} };
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
   }).catch(function() { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
 }

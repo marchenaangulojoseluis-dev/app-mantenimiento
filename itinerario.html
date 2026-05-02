@@ -1081,7 +1081,7 @@ function buildPrintLayout() {
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px">';
     personalTags.forEach(pt => {
       const name = pt.textContent.trim();
-      html += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e8eef8;color:#1B3F8B;border:1px solid #d0daf0">' + name + '</span>';
+      html += '<span style="font-size:10px;font-weight:600;padding:2px 8px;border-radius:20px;background:#e8eef8;color:#1B3F8B;border:1px solid #d0daf0">' + name.replace('(',' (') + '</span>';
     });
     if (!personalTags.length) html += '<span style="font-size:11px;color:#8a9ab8">Sin asignar</span>';
     html += '</div></div>';

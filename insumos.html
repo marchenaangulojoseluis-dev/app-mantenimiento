@@ -450,6 +450,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
+const MA_ADM='marchenaangulojoseluis@gmail.com';
 const _fbApp=firebase.initializeApp(window.__firebaseConfig);
 const db=firebase.firestore();
 window.__auth=firebase.auth();
@@ -535,6 +536,7 @@ async function maVerify(payload,save){
       // name siempre viene del payload de Google, no de Firestore
       name: payload.name || fsData.nombre || fsData.name || email,
     };
+    if(maUser.email===MA_ADM.toLowerCase())maUser.rol='SUPER_ADMIN';
     if(!PERMS[maUser.rol])maUser.rol='TECNICO';
     if(save)sessionStorage.setItem('ma_user',JSON.stringify(maUser));
     if(ldEl)ldEl.classList.remove('show');

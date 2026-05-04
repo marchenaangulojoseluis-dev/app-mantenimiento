@@ -932,7 +932,39 @@ function exportWhatsApp() {
   }).catch(() => {
     // Fallback: open in new window for easy copy
     const w = window.open('', '_blank', 'width=600,height=700');
-    w.document.write('<html><body style="font-family:monospace;white-space:pre-wrap;padding:20px;background:#111;color:#eee;font-size:13px">' + fullTxt.replace(/</g,'&lt;') + '</body></html>');
+    w.document.write('<html><body style="font-family:monospace;white-space:pre-wrap;padding:20px;background:#111;color:#eee;font-size:13px">' + fullTxt.replace(/</g,'&lt;') + '
+<!-- ══ PANEL DE ACCESOS (overlay) ══ -->
+<div id="ma-access-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.5);z-index:9000;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
+  <div style="background:#fff;border:1.5px solid #d0daf0;border-radius:14px;width:580px;max-width:100%;overflow:hidden;box-shadow:0 8px 32px rgba(27,63,139,.18)">
+    <div style="padding:16px 22px;border-bottom:1.5px solid #d0daf0;background:#e8eef8;display:flex;align-items:center;gap:10px">
+      <span style="font-size:14px;font-weight:700;color:#1B3F8B;flex:1">⚙️ Gestión de accesos</span>
+      <button onclick="maCloseAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:inherit">✕</button>
+    </div>
+    <div style="padding:18px 22px">
+      <!-- Descripción de roles -->
+      <div style="background:#f5f8ff;border-left:3px solid #1B3F8B;border-radius:0 6px 6px 0;padding:10px 14px;font-size:11px;color:#6a7a9a;line-height:1.8;margin-bottom:16px">
+        <strong style="color:#1a9e5a">TÉCNICO</strong> — solo solicita salidas en Insumos (requieren aprobación)<br>
+        <strong style="color:#6b3fa0">SUPERVISOR</strong> — aprueba solicitudes, registra salidas y transferencias directas<br>
+        <strong style="color:#1B3F8B">ADMIN</strong> — gestión completa de todas las apps<br>
+        <strong style="color:#d4621a">SUPER ADMIN</strong> — acceso total sin restricciones
+      </div>
+      <!-- Lista de usuarios -->
+      <div id="ma-access-list" style="display:flex;flex-direction:column;gap:0;margin-bottom:16px;max-height:320px;overflow-y:auto"></div>
+      <!-- Agregar usuario -->
+      <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #d0daf0">
+        <input type="email" id="ma-new-email" placeholder="nuevo@email.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+        <select id="ma-new-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:12px;font-family:inherit;outline:none;background:#fff">
+          <option value="TECNICO">TÉCNICO</option>
+          <option value="SUPERVISOR">SUPERVISOR</option>
+          <option value="ADMIN">ADMIN</option>
+          <option value="SUPER_ADMIN">SUPER ADMIN</option>
+        </select>
+        <button onclick="maAddUser()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">+ Agregar</button>
+      </div>
+    </div>
+  </div>
+</div>
+</body></html>');
     w.document.close();
   });
 }
@@ -1449,11 +1481,11 @@ function maGetEmails(){
     const emails=users.map(function(u){return u.email.toLowerCase();});
     const roles={},appsMap={};
     users.forEach(function(u){roles[u.email.toLowerCase()]=u.rol||'USUARIO';appsMap[u.email.toLowerCase()]=u.apps||[];});
-    if(emails.indexOf(MA_ADM.toLowerCase())===-1){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
+    if(emails.indexOf(MA_ADM.toLowerCase())===-1){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='SUPER_ADMIN';}
     maEmails={emails,roles,apps:appsMap};
     sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
-  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{},apps:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
+  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{},apps:{}};maEmails.roles[MA_ADM.toLowerCase()]='SUPER_ADMIN';return maEmails;});
 }
 function maLogAccess(email){ /* Firebase */ }
 function maRenderPill(){
@@ -1563,139 +1595,113 @@ function maToggleRole(email){
 // ── GESTIÓN DE ACCESOS ────────────────────────────────────────────────────────
 let accessUsers = [];
 
-function openAccessPanel() {
-  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { 
-    alert('Solo administradores pueden gestionar accesos'); 
-    return; 
-  }
-  const overlay = document.getElementById('access-overlay');
-  if (overlay) { overlay.style.display = 'flex'; loadAccessUsers(); }
-  const menu = document.getElementById('user-menu');
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+// ── PANEL DE ACCESOS UNIFICADO ────────────────────────────────────────────
+var maAccessUsers = [];
+var MA_ROLES = ['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'];
+var MA_ROL_COLORS = {TECNICO:'#1a9e5a',SUPERVISOR:'#6b3fa0',ADMIN:'#1B3F8B',SUPER_ADMIN:'#d4621a'};
+var MA_ROL_BGS    = {TECNICO:'#f0faf5',SUPERVISOR:'#f3eeff',ADMIN:'#e8eef8',SUPER_ADMIN:'#fff3eb'};
+
+async function openAccessPanel() {
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) return;
+  var menu = document.getElementById('user-menu');
   if (menu) menu.classList.remove('open');
+  var snap = await window.__db.collection('usuarios').get();
+  maAccessUsers = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+  maRenderAccessPanel();
+  document.getElementById('ma-access-overlay').style.display = 'flex';
 }
 
-function closeAccessPanel() {
-  const overlay = document.getElementById('access-overlay');
-  if (overlay) overlay.style.display = 'none';
+function maCloseAccessPanel() {
+  document.getElementById('ma-access-overlay').style.display = 'none';
 }
 
-async function loadAccessUsers() {
-  const list = document.getElementById('access-users-list');
-  if (!list) return;
-  list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Cargando...</div>';
-  
-  try {
-    const { getDocs, collection } = window.__fb;
-    const snap = await getDocs(collection(window.__db, 'usuarios'));
-    accessUsers = snap.docs.map(d => d.data()).sort((a,b) => a.email.localeCompare(b.email));
-    renderAccessUsers();
-  } catch(e) {
-    list.innerHTML = '<div style="color:#d63344;font-size:12px;padding:16px">Error cargando usuarios: ' + e.message + '</div>';
-  }
-}
-
-function renderAccessUsers() {
-  var list = document.getElementById('access-users-list');
-  if (!accessUsers.length) {
-    list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Sin usuarios registrados</div>';
+function maRenderAccessPanel() {
+  var list = document.getElementById('ma-access-list');
+  if (!maAccessUsers.length) {
+    list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Sin usuarios</div>';
     return;
   }
-  var html = '';
-  for (var i = 0; i < accessUsers.length; i++) {
-    var u = accessUsers[i];
+  var iAmSuperAdmin = maUser && maUser.rol === 'SUPER_ADMIN';
+  list.innerHTML = maAccessUsers.map(function(u) {
     var isMe = maUser && u.email === maUser.email;
-    var rolColor = u.rol === 'ADMIN' ? '#1B3F8B' : '#6a7a9a';
-    var rolBg = u.rol === 'ADMIN' ? '#e8eef8' : '#f5f8ff';
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px;margin-bottom:4px">';
-    html += '<div style="flex:1;font-size:13px;color:#1a2540">' + u.email;
-    if (isMe) html += ' <span style="font-size:10px;color:#1B3F8B">(tú)</span>';
-    html += '</div>';
-    html += '<select data-email="' + u.email + '" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rolColor + ';background:' + rolBg + ';outline:none"' + (isMe ? ' disabled' : '') + '>';
-    ['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'].forEach(function(r){
-      html += '<option value="'+r+'"'+(u.rol===r?' selected':'')+'>'+r.replace('_',' ')+'</option>';
-    });
-    html += '</select>';
-    if (!isMe) html += '<button data-email="' + u.email + '" onclick="removeUserAccessByEl(this)" style="background:none;border:none;color:#d63344;cursor:pointer;font-size:16px;padding:2px 6px" title="Eliminar">x</button>';
-    html += '</div>';
-  }
-  list.innerHTML = html;
-}
-function changeUserRolByEl(sel) { changeUserRol(sel.getAttribute('data-email'), sel.value); }
-function removeUserAccessByEl(btn) { removeUserAccess(btn.getAttribute('data-email')); }
-
-async function addUserAccess() {
-  const email = document.getElementById('new-user-email')?.value?.trim()?.toLowerCase();
-  const rol = document.getElementById('new-user-rol')?.value || 'USUARIO';
-  if (!email || !email.includes('@')) { alert('Ingresa un email válido'); return; }
-  if (accessUsers.find(u => u.email === email)) { alert('Este usuario ya existe'); return; }
-  
-  try {
-    const { setDoc, doc } = window.__fb;
-    await setDoc(doc(window.__db, 'usuarios', email), { email, rol });
-    accessUsers.push({ email, rol });
-    accessUsers.sort((a,b) => a.email.localeCompare(b.email));
-    document.getElementById('new-user-email').value = '';
-    renderAccessUsers();
-    // Clear email cache
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
-  } catch(e) { alert('Error agregando usuario: ' + e.message); }
+    var rol = u.rol || 'TECNICO';
+    var isSuperTarget = rol === 'SUPER_ADMIN';
+    // Solo SUPER_ADMIN puede modificar a otros SUPER_ADMIN
+    var canEdit = isMe ? false : (isSuperTarget ? iAmSuperAdmin : true);
+    var canDelete = !isMe && (isSuperTarget ? iAmSuperAdmin : true);
+    var rColor = MA_ROL_COLORS[rol] || '#6a7a9a';
+    var rBg    = MA_ROL_BGS[rol]    || '#f5f8ff';
+    var opts = MA_ROLES.map(function(r) {
+      return '<option value="'+r+'"'+(rol===r?' selected':'')+'>'+r.replace('_',' ')+'</option>';
+    }).join('');
+    return '<div style="display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #e8eef8;font-size:12px">'
+      + '<div style="flex:1;font-family:monospace;font-size:11px;color:#1a2540">'+u.email
+        +(isMe?' <span style="font-size:9px;color:#1B3F8B;font-weight:700">(tú)</span>':'')
+        +(isSuperTarget&&!isMe?' <span style="font-size:9px;color:#d4621a;font-weight:700">★</span>':'')
+      +'</div>'
+      + '<select onchange="maChangeRol(''+u.email+'',this.value)" '+(canEdit?'':'disabled')+' style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:'+rColor+';background:'+rBg+';outline:none;'+(canEdit?'cursor:pointer':'cursor:not-allowed;opacity:.6')+'">'
+      + opts + '</select>'
+      + (canDelete ? '<button onclick="maDeleteUser(''+u.email+'')" style="background:none;border:1px solid #f0c0c8;color:#d63344;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px" title="Eliminar">🗑</button>' : '<span style="width:34px"></span>')
+      + '</div>';
+  }).join('');
 }
 
-async function removeUserAccess(email) {
-  if (!confirm('¿Eliminar acceso de ' + email + '?')) return;
+async function maChangeRol(email, rol) {
   try {
-    const { deleteDoc, doc } = window.__fb;
-    await deleteDoc(doc(window.__db, 'usuarios', email));
-    accessUsers = accessUsers.filter(u => u.email !== email);
-    renderAccessUsers();
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
-  } catch(e) { alert('Error eliminando usuario: ' + e.message); }
-}
-
-async function changeUserRol(email, newRol) {
-  try {
-    const { setDoc, doc } = window.__fb;
-    await setDoc(doc(window.__db, 'usuarios', email), { email, rol: newRol });
-    const u = accessUsers.find(u => u.email === email);
-    if (u) u.rol = newRol;
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
+    await window.__db.collection('usuarios').doc(email).update({rol: rol});
+    var u = maAccessUsers.find(function(x){ return x.email === email; });
+    if (u) u.rol = rol;
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
   } catch(e) { alert('Error cambiando rol: ' + e.message); }
 }
 
+async function maDeleteUser(email) {
+  if (!confirm('¿Eliminar acceso de ' + email + '?')) return;
+  try {
+    await window.__db.collection('usuarios').doc(email).delete();
+    maAccessUsers = maAccessUsers.filter(function(x){ return x.email !== email; });
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
+  } catch(e) { alert('Error eliminando usuario: ' + e.message); }
+}
+
+async function maAddUser() {
+  var email = (document.getElementById('ma-new-email').value || '').trim().toLowerCase();
+  var rol   = document.getElementById('ma-new-rol').value;
+  if (!email || !email.includes('@')) { alert('Ingresa un email válido'); return; }
+  if (maAccessUsers.find(function(u){ return u.email === email; })) { alert('Este usuario ya existe'); return; }
+  try {
+    await window.__db.collection('usuarios').doc(email).set({email: email, rol: rol, apps: []});
+    maAccessUsers.push({email: email, rol: rol, apps: []});
+    document.getElementById('ma-new-email').value = '';
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
+  } catch(e) { alert('Error agregando usuario: ' + e.message); }
+}
+
+document.addEventListener('click', function(e) {
+  var ov = document.getElementById('ma-access-overlay');
+  if (ov && e.target === ov) maCloseAccessPanel();
+});
 </script>
 
 
 <!-- PANEL DE GESTIÓN DE ACCESOS -->
-<div class="overlay" id="access-overlay" onclick="if(event.target===this)closeAccessPanel()" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
-  <div style="background:#fff;border:1.5px solid #d0daf0;border-radius:14px;width:560px;max-width:100%;overflow:hidden;box-shadow:0 8px 32px rgba(27,63,139,.14)">
-    <div style="padding:18px 22px;border-bottom:1.5px solid #d0daf0;background:#e8eef8;display:flex;align-items:center;gap:10px">
-      <h2 style="font-size:14px;font-weight:700;color:#1B3F8B;flex:1">⚙️ Gestión de accesos</h2>
-      <button onclick="closeAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✕</button>
-    </div>
-    <div style="padding:20px 22px">
-      <p style="font-size:12px;color:#6a7a9a;margin-bottom:16px">Administra los usuarios que pueden acceder al sistema. Solo admins pueden ver este panel.</p>
-      
-      <!-- Add user -->
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <input type="email" id="new-user-email" placeholder="correo@ejemplo.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-        <select id="new-user-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
-          <option value="TECNICO">TÉCNICO</option>
-          <option value="SUPERVISOR">SUPERVISOR</option>
-          <option value="ADMIN">ADMIN</option>
-          <option value="SUPER_ADMIN">SUPER ADMIN</option>
-        </select>
-        <button onclick="addUserAccess()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Agregar</button>
-      </div>
-
-      <!-- Users list -->
-      <div id="access-users-list" style="display:flex;flex-direction:column;gap:6px;max-height:350px;overflow-y:auto">
-        <div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Cargando...</div>
-      </div>
-    </div>
-  </div>
-</div>
 </body>
 </html>

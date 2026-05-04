@@ -305,7 +305,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
           <option value="PAR">Par</option><option value="JGO">Juego</option>
         </select>
       </div>
-      <div class="form-group"><div class="form-label">Código interno</div><input type="text" class="form-input" id="fi-codigo" placeholder="Ej: INS-001"></div>
+      <div class="form-group"><div class="form-label">Código interno</div><input type="text" class="form-input" id="fi-codigo" placeholder="Ej: INS-001 *" required></div>
       <div class="form-group"><div class="form-label">Marca</div><input type="text" class="form-input" id="fi-marca" placeholder="Ej: 3M"></div>
       <div class="form-group"><div class="form-label">Modelo</div><input type="text" class="form-input" id="fi-modelo" placeholder="Opcional"></div>
       <div class="form-group full"><div class="form-label">Stock mínimo (alerta)</div><input type="text" class="form-input" id="fi-stock-min" placeholder="Ej: 5 — deja 0 para no alertar"></div>
@@ -468,7 +468,7 @@ function maSignOut(){firebase.auth().signOut().then(()=>{sessionStorage.removeIt
 // TECNICO: solo solicita salidas/transferencias (van a aprobación)
 const PERMS = {
   SUPER_ADMIN: { crearItem:1,editarItem:1,eliminarItem:1,entrada:1,salida:1,transferencia:1,aprobar:1,paquetes:1,editarMov:1,eliminarMov:1 },
-  ADMIN:       { crearItem:1,editarItem:1,eliminarItem:0,entrada:1,salida:1,transferencia:1,aprobar:1,paquetes:1,editarMov:0,eliminarMov:1 },
+  ADMIN:       { crearItem:1,editarItem:1,eliminarItem:1,entrada:1,salida:1,transferencia:1,aprobar:1,paquetes:1,editarMov:1,eliminarMov:1 },
   SUPERVISOR:  { crearItem:0,editarItem:0,eliminarItem:0,entrada:0,salida:1,transferencia:1,aprobar:1,paquetes:0,editarMov:0,eliminarMov:0 },
   TECNICO:     { crearItem:0,editarItem:0,eliminarItem:0,entrada:0,salida:'sol',transferencia:'sol',aprobar:0,paquetes:0,editarMov:0,eliminarMov:0 },
 };
@@ -592,15 +592,20 @@ function renderAccessPanel(){
   const list=document.getElementById('access-list');
   if(!accessUsers.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">Sin usuarios</div>';return;}
   const ROLES=['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'];
+  const iAmSuperAdmin=maUser&&maUser.rol==='SUPER_ADMIN';
   list.innerHTML=accessUsers.map(u=>{
     const isMe=u.email===maUser.email;
-    const opts=ROLES.map(r=>`<option value="${r}"${u.rol===r?' selected':''}>${r.replace('_',' ')}</option>`).join('');
+    const rol=u.rol||'TECNICO';
+    const isSuperTarget=rol==='SUPER_ADMIN';
+    const canEdit=!isMe&&(isSuperTarget?iAmSuperAdmin:true);
+    const canDelete=!isMe&&(isSuperTarget?iAmSuperAdmin:true);
+    const opts=ROLES.map(r=>`<option value="${r}"${rol===r?' selected':''}>${r.replace('_',' ')}</option>`).join('');
     return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px">
-      <div style="flex:1;font-family:var(--mono);font-size:11px">${u.email}</div>
-      <select style="width:140px;font-size:11px;padding:4px 8px" ${isMe?'disabled':''} onchange="changeUserRol('${u.email}',this.value)">
+      <div style="flex:1;font-family:var(--mono);font-size:11px">${u.email}${isMe?' <span style="font-size:9px;color:var(--blue);font-weight:700">(tú)</span>':''}${isSuperTarget&&!isMe?' <span style="font-size:9px;color:var(--orange-dark)">★</span>':''}</div>
+      <select style="width:140px;font-size:11px;padding:4px 8px;${canEdit?'':'opacity:.6;cursor:not-allowed'}" ${canEdit?'':' disabled'} onchange="changeUserRol('${u.email}',this.value)">
         ${opts}
       </select>
-      ${!isMe?`<button class="btn btn-sm btn-red" onclick="deleteUser('${u.email}')">🗑</button>`:'<span style="width:34px"></span>'}
+      ${canDelete?`<button class="btn btn-sm btn-red" onclick="deleteUser('${u.email}')">🗑</button>`:'<span style="width:34px"></span>'}
     </div>`;
   }).join('');
 }
@@ -963,9 +968,11 @@ function openModalInsumo(id){
 
 async function saveInsumo(){
   const nombre=document.getElementById('fi-nombre').value.trim();
+  const codigo=document.getElementById('fi-codigo').value.trim().toUpperCase();
   if(!nombre){toast('Nombre obligatorio','err');return;}
+  if(!codigo){toast('El código es obligatorio','err');return;}
   const item={nombre,categoria:document.getElementById('fi-cat').value,unidad:document.getElementById('fi-unidad').value,
-    codigo:document.getElementById('fi-codigo').value.trim().toUpperCase(),
+    codigo:codigo,
     marca:document.getElementById('fi-marca').value.trim(),modelo:document.getElementById('fi-modelo').value.trim(),
     stockMin:Number(document.getElementById('fi-stock-min').value)||0,
     tipoCantidad:document.getElementById('fi-tipo-cant').value||'UNIDAD',

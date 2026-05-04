@@ -453,7 +453,7 @@ function maVerify(payload, save) {
     if (ldEl) ldEl.classList.remove('show');
 
     // Check admin
-    if (rol !== 'ADMIN') {
+    if (['ADMIN','SUPER_ADMIN'].indexOf(rol) === -1) {
       if (adminOnlyEl) adminOnlyEl.classList.add('show');
       // Show overlay but disable editing
       document.getElementById('auth-overlay').style.display = 'none';
@@ -501,7 +501,7 @@ function maRenderPill() {
   var n = maUser.name || maUser.email;
   try { n = decodeURIComponent(escape(n)); } catch(e) {}
   var init = n.split(' ').map(function(x) { return x[0]; }).join('').substring(0, 2).toUpperCase();
-  var isAdmin = maUser.rol === 'ADMIN';
+  var isAdmin = maUser.rol === 'ADMIN' || maUser.rol === 'SUPER_ADMIN';
   var adminItem = isAdmin ? '<button class="user-menu-item" onclick="openAccessPanel()">⚙️ Gestión de accesos</button><div class="user-menu-divider"></div>' : '';
   pill.innerHTML = (maUser.picture ? '<img class="user-avatar" src="' + maUser.picture + '">' : '<div class="user-avatar-init">' + init + '</div>')
     + '<span class="user-name">' + n + '</span>'
@@ -692,7 +692,7 @@ function onDrop(e, targetIdx) {
 
 // ── SAVE ──────────────────────────────────────────────────────────────────────
 async function saveTareas() {
-  if (!maUser || maUser.rol !== 'ADMIN') { toast('Solo admins pueden guardar', 'err'); return; }
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { toast('Solo admins pueden guardar', 'err'); return; }
   document.getElementById('loading').classList.add('show');
   const rows = [];
   Object.keys(tareasData).forEach(tipo => {
@@ -723,7 +723,7 @@ async function saveTareas() {
 let accessUsers = [];
 
 function openAccessPanel() {
-  if (!maUser || maUser.rol !== 'ADMIN') { 
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { 
     alert('Solo administradores pueden gestionar accesos'); 
     return; 
   }
@@ -1021,7 +1021,7 @@ async function processZip(file) {
 
 async function confirmImport() {
   if (!pendingImport) return;
-  if (!maUser || maUser.rol !== 'ADMIN') { toast('Solo admins pueden importar', 'err'); return; }
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { toast('Solo admins pueden importar', 'err'); return; }
 
   const mode = document.querySelector('input[name="import-mode"]:checked').value;
   const confirmMsg = mode === 'replace'
@@ -1323,7 +1323,7 @@ function switchMaestroTab(tab) {
 }
 
 async function saveMaestros() {
-  if (!maUser || maUser.rol !== 'ADMIN') { toast('Solo admins pueden guardar', 'err'); return; }
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { toast('Solo admins pueden guardar', 'err'); return; }
   document.getElementById('loading').classList.add('show');
   try {
     // Save personal

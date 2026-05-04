@@ -153,6 +153,19 @@ tbody td{padding:9px 12px;vertical-align:middle}
 .paq-row{display:flex;gap:7px;align-items:center;margin-bottom:7px}
 .empty{text-align:center;padding:50px 20px;color:var(--muted)}
 .empty-icon{font-size:38px;margin-bottom:10px}
+/* AUTH OVERLAY */
+#auth-overlay{position:fixed;inset:0;background:var(--bg);z-index:9999;display:flex;align-items:center;justify-content:center;padding:20px}
+.auth-card{background:var(--surface);border:1.5px solid var(--border);border-radius:16px;padding:36px 32px;max-width:380px;width:100%;text-align:center;box-shadow:var(--shadow-lg)}
+.auth-logo{display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:24px}
+.auth-logo-dot{width:10px;height:10px;border-radius:50%;background:var(--orange)}
+.auth-logo-text{font-weight:700;font-size:20px;color:var(--blue)}
+.auth-title{font-size:15px;font-weight:700;color:var(--accent);margin-bottom:6px}
+.auth-sub{font-size:12px;color:var(--muted2);margin-bottom:24px;line-height:1.5}
+.auth-err{margin-top:14px;padding:10px 14px;background:var(--red-bg);border:1px solid var(--red-border);border-radius:8px;font-size:12px;color:var(--red);display:none;line-height:1.5;text-align:left}
+.auth-err.show{display:block}
+.auth-loading{font-size:12px;color:var(--muted2);margin-top:10px;display:none}
+.auth-loading.show{display:block}
+
 .toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);background:#1a2540;color:#fff;padding:10px 20px;border-radius:8px;font-size:13px;font-weight:500;opacity:0;transition:all .25s;z-index:999;pointer-events:none;white-space:nowrap}
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .toast.ok{background:#1a9e5a}.toast.err{background:#d63344}.toast.warn{background:var(--yellow)}
@@ -169,6 +182,17 @@ tbody td{padding:9px 12px;vertical-align:middle}
     <button class="btn btn-sm" style="color:#fff;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.08)" onclick="location.href='index.html'">← Inicio</button>
   </div>
 </header>
+
+<div id="auth-overlay" style="display:none">
+  <div class="auth-card">
+    <div class="auth-logo"><div class="auth-logo-dot"></div><div class="auth-logo-text">MultiAire</div></div>
+    <div class="auth-title">Insumos</div>
+    <div class="auth-sub">Inicia sesión con tu cuenta Google autorizada.</div>
+    <div id="g-btn" style="display:flex;justify-content:center;margin-bottom:4px"></div>
+    <div class="auth-err" id="auth-err"></div>
+    <div class="auth-loading" id="auth-loading"></div>
+  </div>
+</div>
 
 <div class="app">
   <div class="sidebar">
@@ -285,6 +309,14 @@ tbody td{padding:9px 12px;vertical-align:middle}
       <div class="form-group"><div class="form-label">Marca</div><input type="text" class="form-input" id="fi-marca" placeholder="Ej: 3M"></div>
       <div class="form-group"><div class="form-label">Modelo</div><input type="text" class="form-input" id="fi-modelo" placeholder="Opcional"></div>
       <div class="form-group full"><div class="form-label">Stock mínimo (alerta)</div><input type="text" class="form-input" id="fi-stock-min" placeholder="Ej: 5 — deja 0 para no alertar"></div>
+      <div class="form-group full">
+        <div class="form-label">Tipo de cantidad</div>
+        <select class="form-select" id="fi-tipo-cant" onchange="toggleStockMinField()">
+          <option value="UNIDAD">Unidades exactas (ej: 5 filtros, 3 escobillas)</option>
+          <option value="RANGO">Porcentaje visual — LLENO / MEDIO / BAJO / VACÍO (ej: refrigerante, aceite)</option>
+        </select>
+        <div style="font-size:10px;color:var(--muted2);margin-top:4px" id="rango-hint" style="display:none">Con tipo Rango, el stock se actualiza por % estimado en cada sede (0–100%). No se usa para paquetes.</div>
+      </div>
     </div>
     <div class="modal-foot">
       <button class="btn" onclick="closeModal('modal-insumo')">Cancelar</button>
@@ -371,6 +403,19 @@ tbody td{padding:9px 12px;vertical-align:middle}
   </div>
 </div>
 
+<!-- MODAL ACTUALIZAR RANGO -->
+<div class="modal-overlay" id="modal-rango">
+  <div class="modal">
+    <h2>📊 Actualizar nivel de ítem</h2>
+    <div class="modal-sub">Indica el nivel estimado del insumo en cada sede. Esto no genera un movimiento contable — es solo una actualización visual del estado actual.</div>
+    <div id="rango-sedes-list" style="display:flex;flex-direction:column;gap:10px;margin-bottom:14px"></div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-rango')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveRango()">💾 Actualizar niveles</button>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL ACCESOS -->
 <div class="modal-overlay" id="modal-access">
   <div class="modal">
@@ -405,9 +450,16 @@ tbody td{padding:9px 12px;vertical-align:middle}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
-const app  = firebase.initializeApp(window.__firebaseConfig);
-const db   = firebase.firestore();
-const auth = firebase.auth();
+const _fbApp=firebase.initializeApp(window.__firebaseConfig);
+const db=firebase.firestore();
+window.__auth=firebase.auth();
+window.__prov=new firebase.auth.GoogleAuthProvider();
+window.__fb={
+  onAuthStateChanged:(auth,cb)=>firebase.auth().onAuthStateChanged(cb),
+  signInWithPopup:(auth,prov)=>firebase.auth().signInWithPopup(prov),
+  signOut:()=>firebase.auth().signOut(),
+};
+function maSignOut(){firebase.auth().signOut().then(()=>{sessionStorage.removeItem('ma_user');location.href='index.html';});}
 
 // ── ROLES ─────────────────────────────────────────────────────────────────────
 // SUPER_ADMIN: todo
@@ -425,18 +477,79 @@ function can(p){ return (PERMS[maUser?.rol]||PERMS.TECNICO)[p]||0; }
 let maUser=null, catalogoData=[], movimientosData=[], stockData={}, sedes=[], personalData=[], paquetesData=[];
 let filteredCatalogo=[], currentMovTipo='SALIDA', editingInsumoId=null, editingPaqId=null, applyingPaqId=null, paqRowIdx=0;
 
-auth.onAuthStateChanged(async user=>{
-  if(!user){location.href='index.html';return;}
-  const snap=await db.collection('usuarios').doc(user.email).get();
-  if(!snap.exists){auth.signOut();location.href='index.html';return;}
-  maUser={email:user.email,...snap.data()};
-  if(!PERMS[maUser.rol]) maUser.rol='TECNICO';
-  renderUserPill();
-  document.getElementById('conn-pill').textContent='✓ Conectado';
-  document.getElementById('conn-pill').className='hpill ok';
-  buildSidebar();
-  await loadAll();
-});
+// ── AUTH — mismo sistema que otras apps ──────────────────────────────────────
+(function(){
+  function waitForFirebase(){
+    if(window.__auth&&window.__fb){
+      window.__fb.onAuthStateChanged(window.__auth,function(user){
+        if(user&&!window._maInitDone){
+          window._maInitDone=true;
+          maVerify({email:user.email,name:user.displayName,picture:user.photoURL},true);
+        }else if(!user&&!window._maInitDone){
+          window._maInitDone=true;
+          maShowLogin();
+        }
+      });
+    }else{setTimeout(waitForFirebase,50);}
+  }
+  waitForFirebase();
+})();
+
+function maShowLogin(){
+  var ov=document.getElementById('auth-overlay');
+  if(ov){ov.style.display='flex';document.body.style.overflow='hidden';}
+  var btn=document.getElementById('g-btn');
+  if(btn){btn.innerHTML='<button onclick="maFirebaseSignIn()" style="display:flex;align-items:center;gap:10px;padding:10px 20px;border:1.5px solid #d0daf0;border-radius:8px;background:#fff;font-family:IBM Plex Sans,sans-serif;font-size:14px;cursor:pointer;font-weight:500"><img src=\'https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg\' width=18>Continuar con Google</button>';}
+}
+
+async function maFirebaseSignIn(){
+  try{
+    const result=await window.__fb.signInWithPopup(window.__auth,window.__prov);
+    const user=result.user;
+    maVerify({email:user.email,name:user.displayName,picture:user.photoURL},true);
+  }catch(e){
+    var errEl=document.getElementById('auth-err');
+    if(errEl){errEl.textContent='Error al iniciar sesión: '+e.message;errEl.classList.add('show');}
+  }
+}
+
+async function maVerify(payload,save){
+  var email=(payload.email||'').toLowerCase();
+  var errEl=document.getElementById('auth-err');
+  var ldEl=document.getElementById('auth-loading');
+  if(ldEl){ldEl.textContent='Verificando acceso...';ldEl.classList.add('show');}
+  if(errEl)errEl.classList.remove('show');
+  try{
+    const snap=await db.collection('usuarios').doc(email).get();
+    if(!snap.exists){
+      if(ldEl)ldEl.classList.remove('show');
+      if(errEl){errEl.textContent='Acceso denegado para '+email+'. Contacta al administrador.';errEl.classList.add('show');}
+      return;
+    }
+    const fsData = snap.data();
+    maUser={
+      email,
+      name: payload.name || fsData.nombre || fsData.name || email,
+      picture: payload.picture || fsData.picture || '',
+      ...fsData,
+      // name siempre viene del payload de Google, no de Firestore
+      name: payload.name || fsData.nombre || fsData.name || email,
+    };
+    if(!PERMS[maUser.rol])maUser.rol='TECNICO';
+    if(save)sessionStorage.setItem('ma_user',JSON.stringify(maUser));
+    if(ldEl)ldEl.classList.remove('show');
+    document.getElementById('auth-overlay').style.display='none';
+    document.body.style.overflow='';
+    renderUserPill();
+    document.getElementById('conn-pill').textContent='✓ Conectado';
+    document.getElementById('conn-pill').className='hpill ok';
+    buildSidebar();
+    await loadAll();
+  }catch(e){
+    if(ldEl)ldEl.classList.remove('show');
+    if(errEl){errEl.textContent='Error: '+e.message;errEl.classList.add('show');}
+  }
+}
 
 function renderUserPill(){
   const pill=document.getElementById('user-pill');if(!pill||!maUser)return;
@@ -458,7 +571,7 @@ function renderUserPill(){
 function toggleUserMenu(){
   const m=document.getElementById('user-menu');if(m)m.classList.toggle('open');
 }
-function maSignOut(){auth.signOut().then(()=>{location.href='index.html';});}
+function maSignOut(){firebase.auth().signOut().then(()=>{sessionStorage.removeItem('ma_user');location.href='index.html';});}
 
 document.addEventListener('click',e=>{
   const pill=document.getElementById('user-pill');
@@ -526,6 +639,7 @@ function buildSidebar(){
   if(can('salida')==='sol') h+=`<button class="btn btn-block" onclick="openModalMovimiento(null,'SOLICITUD_SALIDA')">⬆ Solicitar salida</button>`;
   if(can('transferencia')===1)    h+=`<button class="btn btn-block" onclick="openModalTransferencia(false)">🔄 Transferencia</button>`;
   if(can('transferencia')==='sol') h+=`<button class="btn btn-block" onclick="openModalTransferencia(true)">🔄 Solicitar transferencia</button>`;
+  if(can('entrada')===1)   h+=`<button class="btn btn-block" onclick="openModalRango()">📊 Actualizar nivel</button>`;
   document.getElementById('sidebar-actions').innerHTML=h;
   if(can('paquetes')) document.getElementById('btn-nuevo-paquete')?.style&&(document.getElementById('btn-nuevo-paquete').style.display='inline-flex');
 }
@@ -596,7 +710,28 @@ function renderAlerts(){
 
 function totalS(id){return Object.values(stockData[id]||{}).reduce((a,b)=>a+(Number(b)||0),0);}
 function sEnSede(id,sede){return Number((stockData[id]||{})[sede]||0);}
-function sNivel(item){const t=totalS(item.id),m=Number(item.stockMin||0);if(t<=0)return'out';if(m>0&&t<=m)return'low';return'ok';}
+function sNivel(item){
+  if(item.tipoCantidad==='RANGO'){
+    const t=totalS(item.id);
+    if(t<=0)return'out'; if(t<=25)return'low'; return'ok';
+  }
+  const t=totalS(item.id),m=Number(item.stockMin||0);
+  if(t<=0)return'out';if(m>0&&t<=m)return'low';return'ok';
+}
+
+// Rangos visuales: el "stock" de un ítem RANGO es 0-100 (promedio de todas las sedes)
+function renderRangoBadge(val,item){
+  // val es la suma de valores por sede — mostramos el promedio si hay varias sedes con stock
+  const sedesConStock=Object.entries(stockData[item.id]||{}).filter(([,v])=>Number(v)>0);
+  const prom=sedesConStock.length?Math.round(sedesConStock.reduce((a,[,v])=>a+Number(v),0)/sedesConStock.length):0;
+  const cfg=prom>75?{cls:'stock-ok',ico:'🟢',lbl:'LLENO'}:prom>40?{cls:'stock-ok',ico:'🟡',lbl:'MEDIO'}:prom>10?{cls:'stock-low',ico:'🟠',lbl:'BAJO'}:{cls:'stock-out',ico:'🔴',lbl:'VACÍO'};
+  return `<span class="stock-pill ${cfg.cls}">${cfg.ico} ${cfg.lbl} ${prom}%</span>`;
+}
+
+function renderRangoBadgeSede(pct){
+  const cfg=pct>75?{cls:'stock-ok',ico:'🟢',lbl:'LLENO'}:pct>40?{cls:'stock-ok',ico:'🟡',lbl:'MEDIO'}:pct>10?{cls:'stock-low',ico:'🟠',lbl:'BAJO'}:{cls:'stock-out',ico:'🔴',lbl:'VACÍO'};
+  return `<span class="stock-pill ${cfg.cls}" style="font-size:10px">${cfg.ico} ${cfg.lbl} ${pct}%</span>`;
+}
 
 function applyFilters(){
   const cat=document.getElementById('f-cat').value;
@@ -616,22 +751,26 @@ function applyFilters(){
 function renderCatalogo(){
   const wrap=document.getElementById('catalogo-table');
   if(!filteredCatalogo.length){wrap.innerHTML='<div class="empty"><div class="empty-icon">📭</div>Sin ítems</div>';return;}
-  const isEd=can('editarItem'),isDel=can('eliminarItem');
+  const isEd=can('editarItem'),isReset=can('eliminarMov');
   wrap.innerHTML=`<table><thead><tr><th>Código</th><th>Nombre</th><th>Cat.</th><th>Marca/Modelo</th><th>Unidad</th><th>Stock total</th>${isEd?'<th></th>':''}</tr></thead><tbody>
   ${filteredCatalogo.map(item=>{
     const n=sNivel(item),t=totalS(item.id);
     const pC=n==='ok'?'stock-ok':n==='low'?'stock-low':'stock-out';
     const cC=item.categoria==='INSUMO'?'cat-insumo':'cat-herramienta';
     const cL=item.categoria==='INSUMO'?'🔧 Insumo':'🛠 Herramienta';
+    const stockDisplay=item.tipoCantidad==='RANGO'
+      ? renderRangoBadge(t,item)
+      : `<span class="stock-pill ${pC}">${t} ${item.unidad||'UND'}</span>`;
     const acts=isEd?`<td><div class="td-actions">
       <button class="btn btn-sm" onclick="openModalInsumo('${item.id}')">✏️</button>
-      ${isDel?`<button class="btn btn-sm btn-red" onclick="deleteInsumo('${item.id}','${item.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+      ${can('eliminarItem')?`<button class="btn btn-sm btn-red" onclick="deleteInsumo('${item.id}','${item.nombre.replace(/'/g,"\\'")}')">🗑</button>`:''}
+      ${isReset?`<button class="btn btn-sm" style="color:var(--muted2)" title="Resetear stock a 0" onclick="resetStockItem('${item.id}','${item.nombre.replace(/'/g,"\\'")}')">⟳</button>`:''}
     </div></td>`:'';
     return `<tr><td class="td-code">${item.codigo||'—'}</td><td class="td-name">${item.nombre}</td>
     <td><span class="td-cat ${cC}">${cL}</span></td>
     <td style="color:var(--muted2);font-size:11px">${item.marca||'—'}${item.modelo?' · '+item.modelo:''}</td>
     <td style="font-family:var(--mono);font-size:11px">${item.unidad||'UND'}</td>
-    <td><span class="stock-pill ${pC}">${t} ${item.unidad||'UND'}</span></td>${acts}</tr>`;
+    <td>${stockDisplay}</td>${acts}</tr>`;
   }).join('')}</tbody></table>`;
 }
 
@@ -724,22 +863,43 @@ async function deleteMovimiento(movId){
   if(!confirm('¿Eliminar este movimiento? Se revertirá el stock.'))return;
   const m=movimientosData.find(x=>x.id===movId);if(!m)return;
   try{
+    // Leer stock FRESCO de Firestore (no usar caché en memoria)
+    const stockSnap=await db.collection('insumos_stock').doc(m.itemId).get();
+    const stockActual=stockSnap.exists?stockSnap.data():{};
+    const getQ=(sede)=>Number(stockActual[sede]||0);
+
     if(m.tipo==='ENTRADA'){
-      const a=sEnSede(m.itemId,m.sede);
-      await db.collection('insumos_stock').doc(m.itemId).set({[m.sede]:Math.max(0,a-m.cantidad)},{merge:true});
-      if(stockData[m.itemId])stockData[m.itemId][m.sede]=Math.max(0,a-m.cantidad);
+      const nuevo=Math.max(0,getQ(m.sede)-m.cantidad);
+      await db.collection('insumos_stock').doc(m.itemId).set({[m.sede]:nuevo},{merge:true});
+      if(!stockData[m.itemId])stockData[m.itemId]={};
+      stockData[m.itemId][m.sede]=nuevo;
     }else if(m.tipo==='SALIDA'){
-      const a=sEnSede(m.itemId,m.sede);
-      await db.collection('insumos_stock').doc(m.itemId).set({[m.sede]:a+m.cantidad},{merge:true});
-      if(stockData[m.itemId])stockData[m.itemId][m.sede]=a+m.cantidad;
+      const nuevo=getQ(m.sede)+m.cantidad;
+      await db.collection('insumos_stock').doc(m.itemId).set({[m.sede]:nuevo},{merge:true});
+      if(!stockData[m.itemId])stockData[m.itemId]={};
+      stockData[m.itemId][m.sede]=nuevo;
     }else if(m.tipo==='TRANSFERENCIA'){
-      const aO=sEnSede(m.itemId,m.sedeOrigen),aD=sEnSede(m.itemId,m.sedeDestino);
-      await db.collection('insumos_stock').doc(m.itemId).set({[m.sedeOrigen]:aO+m.cantidad,[m.sedeDestino]:Math.max(0,aD-m.cantidad)},{merge:true});
-      if(stockData[m.itemId]){stockData[m.itemId][m.sedeOrigen]=aO+m.cantidad;stockData[m.itemId][m.sedeDestino]=Math.max(0,aD-m.cantidad);}
+      const nuevoO=getQ(m.sedeOrigen)+m.cantidad;
+      const nuevoD=Math.max(0,getQ(m.sedeDestino)-m.cantidad);
+      await db.collection('insumos_stock').doc(m.itemId).set({[m.sedeOrigen]:nuevoO,[m.sedeDestino]:nuevoD},{merge:true});
+      if(!stockData[m.itemId])stockData[m.itemId]={};
+      stockData[m.itemId][m.sedeOrigen]=nuevoO;
+      stockData[m.itemId][m.sedeDestino]=nuevoD;
     }
     await db.collection('insumos_movimientos').doc(movId).delete();
     movimientosData=movimientosData.filter(x=>x.id!==movId);
     toast('Movimiento eliminado y stock revertido','ok');
+    renderAll();
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+// Resetear stock de un ítem a 0 en todas las sedes (para correcciones manuales)
+async function resetStockItem(itemId,nombre){
+  if(!confirm(`¿Resetear stock de "${nombre}" a 0 en todas las sedes?\nUsa esto si el stock quedó desfasado.`))return;
+  try{
+    await db.collection('insumos_stock').doc(itemId).delete();
+    stockData[itemId]={};
+    toast('Stock reseteado a 0','ok');
     renderAll();
   }catch(e){toast('Error: '+e.message,'err');}
 }
@@ -755,13 +915,26 @@ function renderStockSede(){
       const items=catalogoData.filter(i=>sEnSede(i.id,sede)>0);
       if(!items.length)return;
       h+=`<div class="sede-stock-card"><div class="sede-stock-name">🏢 ${sede}</div>
-      ${items.map(i=>{const q=sEnSede(i.id,sede);const n=q<=0?'stock-out':(Number(i.stockMin)>0&&q<=Number(i.stockMin))?'stock-low':'stock-ok';
+      ${items.map(i=>{
+        const q=sEnSede(i.id,sede);
+        if(i.tipoCantidad==='RANGO'){
+          return`<div class="sede-stock-item"><span>${i.nombre}</span>${renderRangoBadgeSede(q)}</div>`;
+        }
+        const n=q<=0?'stock-out':(Number(i.stockMin)>0&&q<=Number(i.stockMin))?'stock-low':'stock-ok';
         return`<div class="sede-stock-item"><span>${i.nombre}</span><span class="stock-pill ${n}" style="font-size:10px;padding:1px 6px">${q} ${i.unidad||'UND'}</span></div>`;
       }).join('')}</div>`;
     });
     h+='</div>';
   });
   c.innerHTML=h||'<div class="empty"><div class="empty-icon">📦</div>Sin stock por sede</div>';
+}
+
+function toggleStockMinField(){
+  const v=document.getElementById('fi-tipo-cant').value;
+  const smField=document.getElementById('fi-stock-min')?.closest?.('.form-group');
+  const hint=document.getElementById('rango-hint');
+  if(smField)smField.style.display=v==='RANGO'?'none':'flex';
+  if(hint)hint.style.display=v==='RANGO'?'block':'none';
 }
 
 function openModalInsumo(id){
@@ -776,11 +949,15 @@ function openModalInsumo(id){
     document.getElementById('fi-marca').value=i.marca||'';
     document.getElementById('fi-modelo').value=i.modelo||'';
     document.getElementById('fi-stock-min').value=i.stockMin||'';
+    document.getElementById('fi-tipo-cant').value=i.tipoCantidad||'UNIDAD';
   }else{
     document.getElementById('modal-insumo-title').textContent='Nuevo ítem';
     ['fi-nombre','fi-codigo','fi-marca','fi-modelo','fi-stock-min'].forEach(x=>document.getElementById(x).value='');
-    document.getElementById('fi-cat').value='INSUMO';document.getElementById('fi-unidad').value='UND';
+    document.getElementById('fi-cat').value='INSUMO';
+    document.getElementById('fi-unidad').value='UND';
+    document.getElementById('fi-tipo-cant').value='UNIDAD';
   }
+  toggleStockMinField();
   document.getElementById('modal-insumo').classList.add('open');
 }
 
@@ -791,6 +968,7 @@ async function saveInsumo(){
     codigo:document.getElementById('fi-codigo').value.trim().toUpperCase(),
     marca:document.getElementById('fi-marca').value.trim(),modelo:document.getElementById('fi-modelo').value.trim(),
     stockMin:Number(document.getElementById('fi-stock-min').value)||0,
+    tipoCantidad:document.getElementById('fi-tipo-cant').value||'UNIDAD',
     updatedAt:new Date().toISOString(),createdBy:maUser.email};
   try{
     const docId=editingInsumoId||'INS-'+Date.now();
@@ -1030,6 +1208,74 @@ async function applyPaquete(){
     }
     toast(isSol?'📤 Solicitud enviada':`✓ Paquete "${paq.nombre}" aplicado en ${sede}`,'ok');
     closeModal('modal-apply-paq');renderAll();
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+
+// ── RANGO VISUAL ──────────────────────────────────────────────────────────────
+let rangoItemId=null;
+function openModalRango(itemId){
+  // Si no se pasa itemId, muestra selector de todos los ítems RANGO
+  const rangoItems=catalogoData.filter(i=>i.tipoCantidad==='RANGO');
+  if(!rangoItems.length){toast('No hay ítems con tipo Rango registrados','warn');return;}
+  rangoItemId=itemId||rangoItems[0].id;
+  renderRangoModal();
+  document.getElementById('modal-rango').classList.add('open');
+}
+
+function renderRangoModal(){
+  const item=catalogoData.find(i=>i.id===rangoItemId);
+  if(!item)return;
+  const rangoItems=catalogoData.filter(i=>i.tipoCantidad==='RANGO');
+  // Selector de ítem si hay más de uno
+  const selector=rangoItems.length>1?`<div class="form-group full" style="margin-bottom:14px">
+    <div class="form-label">Ítem</div>
+    <select class="form-select" onchange="rangoItemId=this.value;renderRangoModal()">
+      ${rangoItems.map(i=>`<option value="${i.id}"${i.id===rangoItemId?' selected':''}>${i.nombre}</option>`).join('')}
+    </select>
+  </div>`:'<div style="font-weight:600;margin-bottom:12px">'+item.nombre+'</div>';
+
+  const OPCIONES=[
+    {val:100,ico:'🟢',lbl:'LLENO (100%)'},
+    {val:75,ico:'🟢',lbl:'CASI LLENO (75%)'},
+    {val:50,ico:'🟡',lbl:'MEDIO (50%)'},
+    {val:25,ico:'🟠',lbl:'BAJO (25%)'},
+    {val:5,ico:'🔴',lbl:'CASI VACÍO (5%)'},
+    {val:0,ico:'⚫',lbl:'VACÍO (0%)'},
+  ];
+
+  const sedesHtml=sedes.map(s=>{
+    const actual=sEnSede(item.id,s.sede);
+    const optsHtml=OPCIONES.map(o=>`<option value="${o.val}"${actual===o.val?' selected':''}>${o.ico} ${o.lbl}</option>`).join('');
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border)">
+      <span style="flex:1;font-size:12px;font-weight:500">${s.sede}</span>
+      <span style="font-size:10px;color:var(--muted2)">${renderRangoBadgeSede(actual)}</span>
+      <select class="form-select" id="rango-sede-${s.sede.replace(/\s/g,'_')}" style="width:190px;font-size:11px">${optsHtml}</select>
+    </div>`;
+  }).join('');
+
+  document.getElementById('rango-sedes-list').innerHTML=selector+sedesHtml;
+}
+
+async function saveRango(){
+  const item=catalogoData.find(i=>i.id===rangoItemId);if(!item)return;
+  const updates={};
+  sedes.forEach(s=>{
+    const sel=document.getElementById('rango-sede-'+s.sede.replace(/\s/g,'_'));
+    if(sel)updates[s.sede]=Number(sel.value);
+  });
+  try{
+    await db.collection('insumos_stock').doc(rangoItemId).set(updates,{merge:true});
+    if(!stockData[rangoItemId])stockData[rangoItemId]={};
+    Object.assign(stockData[rangoItemId],updates);
+    // Registrar como movimiento informativo
+    await db.collection('insumos_movimientos').add({
+      itemId:rangoItemId,itemNombre:item.nombre,tipo:'ACTUALIZACION_NIVEL',
+      niveles:updates,usuario:maUser.email,estado:'CONFIRMADO',fecha:new Date(),
+      motivo:'Actualización manual de niveles'
+    });
+    toast('✓ Niveles actualizados','ok');
+    closeModal('modal-rango');
+    renderAll();
   }catch(e){toast('Error: '+e.message,'err');}
 }
 

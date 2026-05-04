@@ -369,9 +369,7 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
 </div>
 
 <script>
-const GAS = 'https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 const MA_ADM = 'marchenaangulojoseluis@gmail.com';
-const MA_GAS = GAS;
 
 // ── STATE ────────────────────────────────────────────────────────────────────
 let maUser = null, maEmails = null;
@@ -486,12 +484,13 @@ function maGetEmails() {
   return getDocs(collection(window.__db,'usuarios')).then(function(snap){
     const users=snap.docs.map(d=>d.data());
     const emails=users.map(u=>u.email.toLowerCase());
-    const roles={};users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';});
+    const roles={},appsMap={};
+    users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';appsMap[u.email.toLowerCase()]=u.apps||[];});
     if(!emails.includes(MA_ADM.toLowerCase())){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
-    maEmails={emails,roles};
+    maEmails={emails,roles,apps:appsMap};
     sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
-  }).catch(function() { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
+  }).catch(function() { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {}, apps: {} }; return maEmails; });
 }
 
 function maLogAccess(email) { /* Firebase */ }
@@ -754,6 +753,14 @@ async function loadAccessUsers() {
   }
 }
 
+const ALL_APPS = [
+  {id:'inventario',  label:'📦 Inventario'},
+  {id:'mantenimiento', label:'🔧 Mantenimiento'},
+  {id:'itinerario',  label:'🗓 Itinerario'},
+  {id:'insumos',     label:'🧰 Insumos'},
+];
+const SUPER_ROLES = ['ADMIN','SUPER_ADMIN'];
+
 function renderAccessUsers() {
   var list = document.getElementById('access-users-list');
   if (!accessUsers.length) {
@@ -767,70 +774,97 @@ function renderAccessUsers() {
   for (var i = 0; i < accessUsers.length; i++) {
     var u = accessUsers[i];
     var isMe = maUser && u.email === maUser.email;
-    var rColor = rolColors[u.rol] || rolColors.USUARIO;
-    var rBg    = rolBgs[u.rol]    || rolBgs.USUARIO;
-    html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px;margin-bottom:4px">';
-    html += '<div style="flex:1;font-size:12px;color:#1a2540;font-family:monospace">' + u.email;
-    if (isMe) html += ' <span style="font-size:10px;color:#1B3F8B">(tú)</span>';
-    html += '</div>';
-    html += '<select data-email="' + u.email + '" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rColor + ';background:' + rBg + ';outline:none;cursor:pointer"' + (isMe ? ' disabled' : '') + '>';
-    ROLES.forEach(function(r) {
-      html += '<option value="' + r + '"' + (u.rol === r ? ' selected' : '') + '>' + r.replace('_',' ') + '</option>';
+    var rol = u.rol || 'USUARIO';
+    var rColor = rolColors[rol] || rolColors.USUARIO;
+    var rBg    = rolBgs[rol]    || rolBgs.USUARIO;
+    var userApps = u.apps || [];
+    var isSuperRol = SUPER_ROLES.indexOf(rol) !== -1;
+    // Apps checkboxes — disabled for super roles (they have all)
+    var appsHtml = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px">';
+    ALL_APPS.forEach(function(app) {
+      var checked = isSuperRol || userApps.indexOf(app.id) !== -1;
+      var dis = isSuperRol || isMe ? ' disabled' : '';
+      appsHtml += '<label style="display:flex;align-items:center;gap:4px;font-size:10px;cursor:pointer;padding:2px 7px;border-radius:10px;border:1px solid #d0daf0;background:' + (checked ? '#e8eef8' : '#fff') + ';color:' + (checked ? '#1B3F8B' : '#8a9ab8') + '">'
+        + '<input type="checkbox" data-email="' + u.email + '" data-app="' + app.id + '"' + (checked ? ' checked' : '') + dis + ' onchange="toggleUserApp(this)" style="margin:0">'
+        + app.label + '</label>';
     });
-    html += '</select>';
+    appsHtml += '</div>';
+    if (isSuperRol) appsHtml += '<div style="font-size:10px;color:#d4621a;margin-top:4px">✓ Acceso total por rol</div>';
+
+    var opts = ROLES.map(function(r) {
+      return '<option value="' + r + '"' + (rol === r ? ' selected' : '') + '>' + r.replace('_',' ') + '</option>';
+    }).join('');
+    html += '<div style="padding:10px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px;margin-bottom:8px">';
+    html += '<div style="display:flex;align-items:center;gap:10px">';
+    html += '<div style="flex:1;font-size:12px;color:#1a2540;font-family:monospace">' + u.email + (isMe ? ' <span style="font-size:10px;color:#1B3F8B">(tú)</span>' : '') + '</div>';
+    html += '<select data-email="' + u.email + '" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rColor + ';background:' + rBg + ';outline:none;cursor:pointer"' + (isMe ? ' disabled' : '') + '>' + opts + '</select>';
     if (!isMe) html += '<button data-email="' + u.email + '" onclick="removeUserAccessByEl(this)" style="background:none;border:none;color:#d63344;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px" title="Eliminar">✕</button>';
-    html += '</div>';
+    html += '</div>' + appsHtml + '</div>';
   }
   list.innerHTML = html;
 }
 
 function changeUserRolByEl(sel) {
-  changeUserRol(sel.getAttribute('data-email'), sel.value);
+  var email = sel.getAttribute('data-email');
+  changeUserRol(email, sel.value);
+  // Re-render to update app checkboxes based on new rol
+  var u = accessUsers.find(function(x){return x.email===email;});
+  if (u) { u.rol = sel.value; renderAccessUsers(); }
 }
 
 function removeUserAccessByEl(btn) {
   removeUserAccess(btn.getAttribute('data-email'));
 }
 
+async function toggleUserApp(checkbox) {
+  var email = checkbox.getAttribute('data-email');
+  var app   = checkbox.getAttribute('data-app');
+  var u = accessUsers.find(function(x){return x.email===email;});
+  if (!u) return;
+  if (!u.apps) u.apps = [];
+  if (checkbox.checked) {
+    if (u.apps.indexOf(app) === -1) u.apps.push(app);
+  } else {
+    u.apps = u.apps.filter(function(a){return a!==app;});
+  }
+  try {
+    await window.__db.collection('usuarios').doc(email).update({apps: u.apps});
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    renderAccessUsers();
+  } catch(e) { alert('Error: ' + e.message); }
+}
+
 async function addUserAccess() {
   const email = document.getElementById('new-user-email')?.value?.trim()?.toLowerCase();
-  const rol = document.getElementById('new-user-rol')?.value || 'USUARIO';
+  const rol = document.getElementById('new-user-rol')?.value || 'TECNICO';
   if (!email || !email.includes('@')) { alert('Ingresa un email válido'); return; }
   if (accessUsers.find(u => u.email === email)) { alert('Este usuario ya existe'); return; }
-  
   try {
-    const { setDoc, doc } = window.__fb;
-    await setDoc(doc(window.__db, 'usuarios', email), { email, rol });
-    accessUsers.push({ email, rol });
+    await window.__db.collection('usuarios').doc(email).set({ email, rol, apps: [] });
+    accessUsers.push({ email, rol, apps: [] });
     accessUsers.sort((a,b) => a.email.localeCompare(b.email));
     document.getElementById('new-user-email').value = '';
     renderAccessUsers();
-    // Clear email cache
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
   } catch(e) { alert('Error agregando usuario: ' + e.message); }
 }
 
 async function removeUserAccess(email) {
   if (!confirm('¿Eliminar acceso de ' + email + '?')) return;
   try {
-    const { deleteDoc, doc } = window.__fb;
-    await deleteDoc(doc(window.__db, 'usuarios', email));
+    await window.__db.collection('usuarios').doc(email).delete();
     accessUsers = accessUsers.filter(u => u.email !== email);
     renderAccessUsers();
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
   } catch(e) { alert('Error eliminando usuario: ' + e.message); }
 }
 
 async function changeUserRol(email, newRol) {
   try {
-    const { setDoc, doc } = window.__fb;
-    await setDoc(doc(window.__db, 'usuarios', email), { email, rol: newRol });
+    await window.__db.collection('usuarios').doc(email).update({ rol: newRol });
     const u = accessUsers.find(u => u.email === email);
     if (u) u.rol = newRol;
-    sessionStorage.removeItem('ma_emails');
-    sessionStorage.removeItem('ma_emails_time');
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
   } catch(e) { alert('Error cambiando rol: ' + e.message); }
 }
 
@@ -853,43 +887,48 @@ async function exportBackup() {
   btn.textContent = '⏳ Generando...';
 
   try {
-    const GAS_URL = GAS;
-    
-    // Fetch all data in parallel
-    const [invRes, maintRes, usersRes, tareasRes] = await Promise.all([
-      fetch(GAS_URL).then(r => r.json()),
-      fetch(GAS_URL + '?action=getAllMaint').then(r => r.json()).catch(() => ({rows:[]})),
-      fetch(GAS_URL + '?action=getEmails').then(r => r.json()),
-      fetch(GAS_URL + '?action=getTareas').then(r => r.json())
+    // Leer todo directo de Firestore
+    const [invSnap, maintSnap, usersSnap, tareasSnap] = await Promise.all([
+      window.__db.collection('inventario').get(),
+      window.__db.collection('mantenimiento').get(),
+      window.__db.collection('usuarios').get(),
+      window.__db.collection('tareas_config').get(),
     ]);
 
     const zip = new JSZip();
 
     // 1. Inventario CSV
-    const invHeaders = ['EQ_ID','SEDE','TIPO','NOMBRE','UBICACION','MARCA','MODELO','SERIE'];
-    const invRows = (invRes.rows || []).map(r => r.map(escapeCSV).join(','));
+    const invHeaders = ['EQ_ID','SEDE','CLIENTE','TIPO','NOMBRE','AREA','MARCA','MODELO','SERIE'];
+    const invRows = invSnap.docs.map(d => {
+      const r = d.data();
+      return [r.eq_id||d.id,r.sede||'',r.cliente||'',r.tipo||'',r.nombre||'',r.area||'',r.marca||'',r.modelo||'',r.serie||''].map(escapeCSV).join(',');
+    });
     zip.file('inventario.csv', [invHeaders.join(','), ...invRows].join('\n'));
 
-    // 2. Mantenimiento CSV  
+    // 2. Mantenimiento CSV
     const maintHeaders = ['CLAVE','SELECCIONADOS','TAREA_STATUS'];
-    const maintRows = (maintRes.rows || []).map(r => r.map(escapeCSV).join(','));
+    const maintRows = maintSnap.docs.map(d => {
+      const r = d.data();
+      return [escapeCSV(d.id), escapeCSV(JSON.stringify(r.seleccionados||{})), escapeCSV(JSON.stringify(r.tarea_status||{}))].join(',');
+    });
     zip.file('mantenimiento.csv', [maintHeaders.join(','), ...maintRows].join('\n'));
 
     // 3. Usuarios CSV
-    const userHeaders = ['EMAIL','ROL'];
-    const emails = usersRes.emails || [];
-    const roles = usersRes.roles || {};
-    const userRows = emails.map(e => escapeCSV(e) + ',' + escapeCSV(roles[e] || 'USUARIO'));
+    const userHeaders = ['EMAIL','ROL','APPS'];
+    const userRows = usersSnap.docs.map(d => {
+      const r = d.data();
+      return [escapeCSV(r.email||d.id), escapeCSV(r.rol||'TECNICO'), escapeCSV((r.apps||[]).join('|'))].join(',');
+    });
     zip.file('usuarios.csv', [userHeaders.join(','), ...userRows].join('\n'));
 
     // 4. Tareas config CSV
     const tareasHeaders = ['TIPO','TAREA','MINUTOS','ORDEN'];
     const tareasRows = [];
-    const tareas = tareasRes.tareas || {};
-    const minutos = tareasRes.minutos || {};
-    Object.keys(tareas).forEach(tipo => {
-      (tareas[tipo] || []).forEach((t, i) => {
-        tareasRows.push([escapeCSV(tipo), escapeCSV(t), (minutos[tipo]||[])[i]||5, i+1].join(','));
+    tareasSnap.docs.forEach(d => {
+      const r = d.data();
+      const tipo = r.tipo || d.id;
+      (r.tareas||[]).forEach((t, i) => {
+        tareasRows.push([escapeCSV(tipo), escapeCSV(t), (r.minutos||[])[i]||5, i+1].join(','));
       });
     });
     zip.file('tareas_config.csv', [tareasHeaders.join(','), ...tareasRows].join('\n'));
@@ -1325,22 +1364,14 @@ async function saveMaestros() {
       <button onclick="closeAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✕</button>
     </div>
     <div style="padding:20px 22px">
-      <p style="font-size:12px;color:#6a7a9a;margin-bottom:8px">Administra los usuarios que pueden acceder al sistema.</p>
-      <div style="background:#f5f8ff;border:1px solid #d0daf0;border-radius:7px;padding:9px 12px;font-size:11px;color:#6a7a9a;line-height:1.7;margin-bottom:14px">
-        <strong style="color:#1a2540">TÉCNICO</strong> — accede a insumos, solicita salidas (requieren aprobación)<br>
-        <strong style="color:#6b3fa0">SUPERVISOR</strong> — aprueba solicitudes, registra salidas y transferencias directas<br>
-        <strong style="color:#1B3F8B">ADMIN</strong> — gestión completa excepto eliminar ítems del catálogo<br>
-        <strong style="color:#d4621a">SUPER ADMIN</strong> — acceso total sin restricciones
-      </div>
+      <p style="font-size:12px;color:#6a7a9a;margin-bottom:16px">Administra los usuarios que pueden acceder al sistema. Solo admins pueden ver este panel.</p>
       
       <!-- Add user -->
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <input type="email" id="new-user-email" placeholder="correo@ejemplo.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
         <select id="new-user-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
-          <option value="TECNICO">TÉCNICO</option>
-          <option value="SUPERVISOR">SUPERVISOR</option>
+          <option value="USUARIO">USUARIO</option>
           <option value="ADMIN">ADMIN</option>
-          <option value="SUPER_ADMIN">SUPER ADMIN</option>
         </select>
         <button onclick="addUserAccess()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Agregar</button>
       </div>

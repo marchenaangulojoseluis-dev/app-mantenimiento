@@ -269,7 +269,6 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
 <div class="toast" id="toast"></div>
 
 <script>
-const GAS = 'https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 
 let data=[], filtered=[], selected=new Set(), sortCol='sede', sortAsc=true, editRow=null;
 
@@ -731,7 +730,6 @@ function exportPDF() {
 <script>
 var MA_CID='859362309270-23def0uf0j6j70upft0u5gg4csoe97k2.apps.googleusercontent.com';
 var MA_ADM='marchenaangulojoseluis@gmail.com';
-var MA_GAS='https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 var maUser=null,maEmails=null;
 // Firebase auth - initialize directly without GSI
 (function(){
@@ -777,6 +775,7 @@ async function maFirebaseSignIn() {
   }
 }
 function maHandleToken(resp){ /* handled by Firebase */ }
+const MA_APP = 'inventario';
 function maVerify(payload,save){
   var email=(payload.email||'').toLowerCase();
   var errEl=document.getElementById('auth-err');
@@ -792,6 +791,15 @@ function maVerify(payload,save){
       sessionStorage.removeItem('ma_user');return;
     }
     var rol=roles[email]||'USUARIO';
+    var appsMap=data.apps||{};
+    if(['ADMIN','SUPER_ADMIN'].indexOf(rol)===-1){
+      var userApps=appsMap[email]||[];
+      if(userApps.indexOf(MA_APP)===-1){
+        if(ldEl)ldEl.classList.remove('show');
+        if(errEl){errEl.textContent='Sin acceso a esta sección ('+MA_APP+'). Contacta al administrador.';errEl.classList.add('show');}
+        sessionStorage.removeItem('ma_user');return;
+      }
+    }
     maUser={email:email,name:payload.name||email,picture:payload.picture||'',rol:rol};
     if(save)sessionStorage.setItem('ma_user',JSON.stringify(maUser));
     if(ldEl)ldEl.classList.remove('show');
@@ -809,14 +817,20 @@ function maGetEmails(){
   var ec=sessionStorage.getItem('ma_emails');
   var et=sessionStorage.getItem('ma_emails_time');
   if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
-  return fetch(MA_GAS+'?action=getEmails').then(function(r){return r.json();}).then(function(d){
-    maEmails={emails:(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();}),roles:d.roles||{}};
-    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));
-    sessionStorage.setItem('ma_emails_time',String(Date.now()));
+  const {getDocs,collection}=window.__fb;
+  return getDocs(collection(window.__db,'usuarios')).then(function(snap){
+    const users=snap.docs.map(function(d){return d.data();});
+    const emails=users.map(function(u){return u.email.toLowerCase();});
+    const roles={},appsMap={};
+    users.forEach(function(u){roles[u.email.toLowerCase()]=u.rol||'USUARIO';appsMap[u.email.toLowerCase()]=u.apps||[];});
+    if(emails.indexOf(MA_ADM.toLowerCase())===-1){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
+    maEmails={emails,roles,apps:appsMap};
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
-  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
+  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{},apps:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }
 function maLogAccess(email){ /* Firebase - no audit log needed */ }
+}
 function maRenderPill(){
   var pill=document.getElementById('user-pill');
   if(!pill||!maUser)return;

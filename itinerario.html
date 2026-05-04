@@ -280,9 +280,7 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
 <div class="toast" id="toast"></div>
 
 <script>
-const GAS = 'https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 const MA_ADM = 'marchenaangulojoseluis@gmail.com';
-const MA_GAS = GAS;
 const DIAS = ['DOMINGO','LUNES','MARTES','MIÉRCOLES','JUEVES','VIERNES','SÁBADO'];
 
 let maUser = null, maEmails = null;
@@ -373,6 +371,7 @@ async function maFirebaseSignIn() {
 
 function maHandleToken(resp) { /* handled by Firebase */ }
 
+const MA_APP = 'itinerario';
 function maVerify(payload, save) {
   var email = (payload.email || '').toLowerCase();
   var errEl = document.getElementById('auth-err');
@@ -382,12 +381,22 @@ function maVerify(payload, save) {
   maGetEmails().then(function(data) {
     var emails = data.emails || [];
     var roles = data.roles || {};
+    var appsMap = data.apps || {};
     if (emails.indexOf(email) === -1) {
       if (ldEl) ldEl.classList.remove('show');
-      if (errEl) { errEl.textContent = 'Acceso denegado para ' + email; errEl.classList.add('show'); }
+      if (errEl) { errEl.textContent = 'Acceso denegado para ' + email + '. Contacta al administrador.'; errEl.classList.add('show'); }
       sessionStorage.removeItem('ma_user'); return;
     }
-    maUser = { email, name: payload.name || email, picture: payload.picture || '', rol: roles[email] || 'USUARIO' };
+    var rol = roles[email] || 'USUARIO';
+    if (['ADMIN','SUPER_ADMIN'].indexOf(rol) === -1) {
+      var userApps = appsMap[email] || [];
+      if (userApps.indexOf(MA_APP) === -1) {
+        if (ldEl) ldEl.classList.remove('show');
+        if (errEl) { errEl.textContent = 'Sin acceso a esta sección (' + MA_APP + '). Contacta al administrador.'; errEl.classList.add('show'); }
+        sessionStorage.removeItem('ma_user'); return;
+      }
+    }
+    maUser = { email, name: payload.name || email, picture: payload.picture || '', rol: rol };
     if (save) sessionStorage.setItem('ma_user', JSON.stringify(maUser));
     if (ldEl) ldEl.classList.remove('show');
     document.getElementById('auth-overlay').style.display = 'none';
@@ -408,12 +417,13 @@ function maGetEmails() {
   return getDocs(collection(window.__db,'usuarios')).then(snap=>{
     const users=snap.docs.map(d=>d.data());
     const emails=users.map(u=>u.email.toLowerCase());
-    const roles={};users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';});
+    const roles={},appsMap={};
+    users.forEach(u=>{roles[u.email.toLowerCase()]=u.rol||'USUARIO';appsMap[u.email.toLowerCase()]=u.apps||[];});
     if(!emails.includes(MA_ADM.toLowerCase())){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
-    maEmails={emails,roles};
+    maEmails={emails,roles,apps:appsMap};
     sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
-  }).catch(() => { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {} }; return maEmails; });
+  }).catch(() => { maEmails = { emails: [MA_ADM.toLowerCase()], roles: {}, apps: {} }; return maEmails; });
 }
 
 function maRenderPill() {
@@ -502,11 +512,8 @@ function renderRecientes(itinerarios) {
 }
 
 function excelDateToDate(excelDate) {
-  if (excelDate instanceof Date) return excelDate;
-  if (!isNaN(new Date(excelDate).getTime()) && String(excelDate).includes('-')) {
-    // String ISO YYYY-MM-DD — agregar mediodía para evitar UTC timezone shift
-    const s = String(excelDate).slice(0, 10);
-    return new Date(s + 'T12:00:00');
+  if (excelDate instanceof Date || (!isNaN(new Date(excelDate).getTime()) && String(excelDate).includes('-'))) {
+    return new Date(excelDate);
   }
   // Excel serial number
   const d = new Date((Number(excelDate) - 25569) * 86400 * 1000);
@@ -514,9 +521,7 @@ function excelDateToDate(excelDate) {
 }
 
 function fmtHora(decimal) {
-  if (!decimal && decimal !== 0) return '--:--';
-  // Si ya es string HH:MM, devolverlo directo
-  if (typeof decimal === 'string' && /^\d{1,2}:\d{2}$/.test(decimal)) return decimal;
+  if (!decimal) return '--:--';
   const totalMin = Math.round(decimal * 24 * 60);
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
@@ -544,7 +549,7 @@ async function loadFecha(fecha) {
       let d;
       if (f && typeof f.toDate === 'function') d = f.toDate();
       else if (f && f.seconds) d = new Date(f.seconds * 1000);
-      else d = excelDateToDate(f);
+      else d = new Date(f);
       // Get UTC date string YYYY-MM-DD
       const dStr = d.toISOString().slice(0, 10);
       return dStr === fd;
@@ -777,8 +782,8 @@ function renderModal(fecha, d, iti) {
         + removeBtn + '</div>';
     });
 
-    const tiendaOpts = maestros.tiendas.map(t => '<option value="' + t.id + '"' + (b.idTienda===t.id?' selected':'') + '>' + t.tienda + '</option>').join('');
-    const grupoOpts = maestros.grupos.map(g => '<option value="' + g.id + '"' + (b.idGrupo===g.id?' selected':'') + '>' + g.grupo + '</option>').join('');
+    const tiendaOpts = maestros.tiendas.map(t => '<option value="' + t.id + '">' + t.tienda + '</option>').join('');
+    const grupoOpts = maestros.grupos.map(g => '<option value="' + g.id + '">' + g.grupo + '</option>').join('');
 
     let html = '<div class="bloque-form-item" id="bloque-form-' + i + '">';
     html += '<div class="bloque-form-num">BLOQUE ' + (i+1) + ' <button class="remove-bloque" onclick="removeBloque(' + i + ')" title="Eliminar bloque">✕</button></div>';
@@ -817,13 +822,20 @@ function renderModal(fecha, d, iti) {
     + '<input type="hidden" id="modal-id-iti" value="' + idIti + '">'
     + '<input type="hidden" id="modal-dia" value="' + diaStr + '">';
 
+  // Set existing values after render
+  setTimeout(() => {
+    editBloques.forEach((b, i) => {
+      if (b.idTienda) { const sel = document.getElementById('bf-tienda-' + i); if(sel) sel.value = b.idTienda; }
+      if (b.idGrupo)  { const sel = document.getElementById('bf-grupo-' + i);  if(sel) sel.value = b.idGrupo; }
+    });
+  }, 50);
+
   const saveBtnEl = document.querySelector('#modal-iti .modal-foot .btn-primary');
   if (saveBtnEl) { saveBtnEl.disabled = false; saveBtnEl.textContent = '💾 Guardar itinerario'; }
   document.getElementById('modal-iti').classList.add('open');
 }
 
 function addBloque() {
-  captureEditBloques();
   const i = editBloques.length;
   editBloques.push(newBloque());
   if (!window.bloquesPersonal) window.bloquesPersonal = {};
@@ -835,7 +847,6 @@ function addBloque() {
 
 function removeBloque(i) {
   if (editBloques.length <= 1) { toast('Debe haber al menos un bloque', 'err'); return; }
-  captureEditBloques();
   editBloques.splice(i, 1);
   // Re-index personal slots
   if (window.bloquesPersonal) {
@@ -938,31 +949,10 @@ async function saveItinerario() {
 
 
 // ── PERSONAL SLOT MANAGEMENT (global) ────────────────────────────────────────
-
-// Captura el estado actual del DOM en editBloques antes de re-renderizar
-function captureEditBloques() {
-  editBloques.forEach((b, i) => {
-    const tiendaSel = document.getElementById('bf-tienda-' + i);
-    const grupoSel  = document.getElementById('bf-grupo-' + i);
-    const hiEl      = document.getElementById('bf-hi-' + i);
-    const hfEl      = document.getElementById('bf-hf-' + i);
-    const estadoSel = document.getElementById('bf-estado-' + i);
-    const detalleEl = document.getElementById('bf-detalle-' + i);
-    if (tiendaSel) { b.idTienda = tiendaSel.value; b.tienda = tiendaSel.options[tiendaSel.selectedIndex]?.text || ''; }
-    if (grupoSel)  { b.idGrupo  = grupoSel.value;  b.grupo  = grupoSel.options[grupoSel.selectedIndex]?.text || ''; }
-    // Horas: el input type=time siempre devuelve HH:MM — solo guardar si no está vacío
-    if (hiEl && hiEl.value)      b.horaInicio = hiEl.value;
-    if (hfEl && hfEl.value)      b.horaFin    = hfEl.value;
-    if (estadoSel) b.estado     = estadoSel.value;
-    if (detalleEl) b.detalle    = detalleEl.value;
-  });
-}
-
 function onPersonalChange(bloqueIdx, slotIdx, value) {
   if (!window.bloquesPersonal) window.bloquesPersonal = {};
   if (!window.bloquesPersonal[bloqueIdx]) window.bloquesPersonal[bloqueIdx] = [];
   window.bloquesPersonal[bloqueIdx][slotIdx] = value;
-  captureEditBloques();
   const fecha = document.getElementById('modal-fecha').value;
   renderModal(fecha, new Date(fecha + 'T12:00:00'), currentIti);
 }
@@ -974,7 +964,6 @@ function addPersonalSlot(bloqueIdx) {
   if (window.bloquesPersonal[bloqueIdx].length >= totalActive) { 
     toast('No hay más personal disponible', 'err'); return; 
   }
-  captureEditBloques();
   window.bloquesPersonal[bloqueIdx].push('');
   const fecha = document.getElementById('modal-fecha').value;
   renderModal(fecha, new Date(fecha + 'T12:00:00'), currentIti);
@@ -982,7 +971,6 @@ function addPersonalSlot(bloqueIdx) {
 
 function removePersonalSlot(bloqueIdx, slotIdx) {
   if (!window.bloquesPersonal?.[bloqueIdx]) return;
-  captureEditBloques();
   window.bloquesPersonal[bloqueIdx].splice(slotIdx, 1);
   const fecha = document.getElementById('modal-fecha').value;
   renderModal(fecha, new Date(fecha + 'T12:00:00'), currentIti);

@@ -169,7 +169,11 @@ option{background:#fff}
 .marcar-btn:hover{border-color:var(--border2)}
 .marcar-btn.done{background:var(--green-bg);border-color:var(--green-border);color:var(--green)}
 .marcar-btn input{width:16px;height:16px;accent-color:var(--green);cursor:pointer}
-
+.save-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.05em;white-space:nowrap;flex-shrink:0}
+.save-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
+.save-btn.saved{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
+.save-btn.saving{border-color:var(--yellow-border);color:var(--yellow);background:var(--yellow-bg)}
+.tareas-footer{display:flex;justify-content:flex-end;margin-top:6px;margin-left:36px}
 
 /* MODAL selección equipos */
 .overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.8);z-index:200;align-items:flex-start;justify-content:center;padding-top:40px;overflow-y:auto}
@@ -411,7 +415,6 @@ option{background:#fff}
 <div class="toast" id="toast"></div>
 
 <script>
-const GAS = 'https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 
 // Tareas por tipo de equipo
 // Tareas cargadas dinámicamente desde TAREAS_CONFIG (Sheet)
@@ -676,7 +679,7 @@ function renderEquipo(eq, tareas) {
         <span class="tarea-label">${t}</span>
         ${peso}
       </label>`;
-    }).join('') + `</div>`;
+    }).join('') + `</div><div class="tareas-footer"><button class="save-btn" id="savebtn-${eq.eq_id}" onclick="saveNow('${eq.eq_id}')">💾 GUARDAR</button></div>`;
   }
 
   const pct = getPct(eq);
@@ -725,7 +728,6 @@ function toggleSoloMarcar(eqId, checked) {
   markDirty(eqId);
   renderMain();
   updateStats();
-  scheduleSave();
 }
 
 function toggleTarea(eqId, idx, checked) {
@@ -734,14 +736,32 @@ function toggleTarea(eqId, idx, checked) {
   markDirty(eqId);
   renderMain();
   updateStats();
-  scheduleSave();
 }
 
 function markDirty(eqId) {
   // visual feedback handled by renderMain re-render
 }
 
-
+async function saveNow(eqId) {
+  const btn = document.getElementById('savebtn-' + eqId);
+  if(btn){ btn.classList.add('saving'); btn.textContent = '⟳ Guardando...'; btn.disabled = true; }
+  const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
+  try {
+    const { setDoc, doc } = window.__fb;
+    await setDoc(doc(window.__db, 'mantenimiento', key), {
+      clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
+    });
+    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
+    if(btn){ btn.classList.remove('saving'); btn.classList.add('saved'); btn.textContent = '✓ Guardado'; btn.disabled = false; }
+    toast('Guardado ✓', 'ok');
+    setTimeout(() => {
+      if(btn){ btn.classList.remove('saved'); btn.textContent = '💾 GUARDAR'; }
+    }, 2000);
+  } catch(e) {
+    if(btn){ btn.classList.remove('saving'); btn.textContent = '💾 GUARDAR'; btn.disabled = false; }
+    toast('Error al guardar', 'err');
+  }
+}
 
 function refreshEquipoCard(eqId) {
   const eq = sedeEquipos.find(e => e.eq_id === eqId);
@@ -782,23 +802,9 @@ async function doSave() {
     await setDoc(doc(window.__db, 'mantenimiento', key), {
       clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
     });
-    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
-    toast('☁️ Guardado automáticamente', 'ok');
+    toast('Guardado ✓', 'ok');
   } catch(e) {
-    toast('⚠️ Error al guardar — reintentando...', 'err');
-    // Retry once after 2s
-    setTimeout(async () => {
-      try {
-        const { setDoc, doc } = window.__fb;
-        await setDoc(doc(window.__db, 'mantenimiento', key), {
-          clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
-        });
-        sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
-        toast('☁️ Guardado automáticamente', 'ok');
-      } catch(e2) {
-        toast('✗ Sin conexión — los cambios podrían perderse', 'err');
-      }
-    }, 2000);
+    toast('Error al guardar', 'err');
   }
   document.getElementById('savingInd').classList.remove('show');
 }
@@ -995,22 +1001,6 @@ function renderDashboard() {
   // ── 3. Por equipo individual (sorted by pct asc)
   const eqSorted = [...sel].sort((a,b)=>getPct(a)-getPct(b));
 
-  // ── 4. Top pendientes: ordenado por minutos pendientes reales (desc)
-  function getMinsPendientes(eq) {
-    const tareas = TAREAS[eq.tipo] || [];
-    const mins = MINUTOS_TAREA[eq.tipo] || [];
-    const statusMap = tareaStatus[eq.eq_id] || {};
-    let pendiente = 0;
-    tareas.forEach((_, i) => {
-      if(statusMap[i] !== true) pendiente += (mins[i] || 10);
-    });
-    return pendiente;
-  }
-  const topPendientes = [...sel]
-    .filter(e => getPct(e) < 100)
-    .sort((a,b) => getMinsPendientes(b) - getMinsPendientes(a))
-    .slice(0, 5);
-
   // counts
   const g=sel.filter(e=>getPct(e)===100).length;
   const y=sel.filter(e=>{const p=getPct(e);return p>0&&p<100}).length;
@@ -1078,14 +1068,12 @@ function renderDashboard() {
       <div class="dash-card">
         <h3>Top Pendientes (mayor peso)</h3>
         <div class="bar-list">
-          ${topPendientes.map(eq=>{
+          ${eqSorted.slice(0,5).filter(e=>getPct(e)<100).map(eq=>{
             const pct=getPct(eq);
             const col=pctColor(pct);
-            const minsPend=getMinsPendientes(eq);
             return `<div class="bar-item">
               <div class="bar-item-header">
                 <span class="bar-item-name" style="font-size:11px">${eq.nombre}</span>
-                <span style="font-family:var(--mono);font-size:10px;color:var(--muted2);margin-left:4px">${minsPend}min</span>
                 <span class="bar-item-pct" style="color:var(--${col})">${pct}%</span>
               </div>
               <div class="bar-track"><div class="bar-fill ${col}" style="width:${pct}%"></div></div>
@@ -1368,7 +1356,6 @@ function toggleSidebar() {
 <script>
 var MA_CID='859362309270-23def0uf0j6j70upft0u5gg4csoe97k2.apps.googleusercontent.com';
 var MA_ADM='marchenaangulojoseluis@gmail.com';
-var MA_GAS='https://script.google.com/macros/s/AKfycbwk8ZI3w_g1AL71LCWcEvQBUcyjyZ2MVFRh6pvrxPe0RibUXoZT-uPtCrOpV4FC6VfM/exec';
 var maUser=null,maEmails=null;
 // Firebase auth - initialize directly without GSI
 (function(){
@@ -1414,6 +1401,7 @@ async function maFirebaseSignIn() {
   }
 }
 function maHandleToken(resp){ /* handled by Firebase */ }
+const MA_APP = 'mantenimiento';
 function maVerify(payload,save){
   var email=(payload.email||'').toLowerCase();
   var errEl=document.getElementById('auth-err');
@@ -1429,6 +1417,15 @@ function maVerify(payload,save){
       sessionStorage.removeItem('ma_user');return;
     }
     var rol=roles[email]||'USUARIO';
+    var appsMap=data.apps||{};
+    if(['ADMIN','SUPER_ADMIN'].indexOf(rol)===-1){
+      var userApps=appsMap[email]||[];
+      if(userApps.indexOf(MA_APP)===-1){
+        if(ldEl)ldEl.classList.remove('show');
+        if(errEl){errEl.textContent='Sin acceso a esta sección ('+MA_APP+'). Contacta al administrador.';errEl.classList.add('show');}
+        sessionStorage.removeItem('ma_user');return;
+      }
+    }
     maUser={email:email,name:payload.name||email,picture:payload.picture||'',rol:rol};
     if(save)sessionStorage.setItem('ma_user',JSON.stringify(maUser));
     if(ldEl)ldEl.classList.remove('show');
@@ -1446,14 +1443,20 @@ function maGetEmails(){
   var ec=sessionStorage.getItem('ma_emails');
   var et=sessionStorage.getItem('ma_emails_time');
   if(ec&&et&&(Date.now()-parseInt(et))<600000){maEmails=JSON.parse(ec);return Promise.resolve(maEmails);}
-  return fetch(MA_GAS+'?action=getEmails').then(function(r){return r.json();}).then(function(d){
-    maEmails={emails:(d.emails||[MA_ADM]).map(function(e){return e.toLowerCase();}),roles:d.roles||{}};
-    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));
-    sessionStorage.setItem('ma_emails_time',String(Date.now()));
+  const {getDocs,collection}=window.__fb;
+  return getDocs(collection(window.__db,'usuarios')).then(function(snap){
+    const users=snap.docs.map(function(d){return d.data();});
+    const emails=users.map(function(u){return u.email.toLowerCase();});
+    const roles={},appsMap={};
+    users.forEach(function(u){roles[u.email.toLowerCase()]=u.rol||'USUARIO';appsMap[u.email.toLowerCase()]=u.apps||[];});
+    if(emails.indexOf(MA_ADM.toLowerCase())===-1){emails.push(MA_ADM.toLowerCase());roles[MA_ADM.toLowerCase()]='ADMIN';}
+    maEmails={emails,roles,apps:appsMap};
+    sessionStorage.setItem('ma_emails',JSON.stringify(maEmails));sessionStorage.setItem('ma_emails_time',String(Date.now()));
     return maEmails;
-  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
+  }).catch(function(){maEmails={emails:[MA_ADM.toLowerCase()],roles:{},apps:{}};maEmails.roles[MA_ADM.toLowerCase()]='ADMIN';return maEmails;});
 }
 function maLogAccess(email){ /* Firebase */ }
+}
 function maRenderPill(){
   var pill=document.getElementById('user-pill');
   if(!pill||!maUser)return;

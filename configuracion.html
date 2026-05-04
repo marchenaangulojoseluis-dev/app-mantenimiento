@@ -760,20 +760,23 @@ function renderAccessUsers() {
     list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Sin usuarios registrados</div>';
     return;
   }
+  var ROLES = ['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'];
+  var rolColors = {TECNICO:'#1a9e5a',SUPERVISOR:'#6b3fa0',ADMIN:'#1B3F8B',SUPER_ADMIN:'#d4621a',USUARIO:'#6a7a9a'};
+  var rolBgs    = {TECNICO:'#f0faf5',SUPERVISOR:'#f3eeff',ADMIN:'#e8eef8',SUPER_ADMIN:'#fff3eb',USUARIO:'#f5f8ff'};
   var html = '';
   for (var i = 0; i < accessUsers.length; i++) {
     var u = accessUsers[i];
     var isMe = maUser && u.email === maUser.email;
-    var rolColor = u.rol === 'ADMIN' ? '#1B3F8B' : '#6a7a9a';
-    var rolBg = u.rol === 'ADMIN' ? '#e8eef8' : '#f5f8ff';
-    var emailEsc = u.email.replace(/'/g, "\'");
+    var rColor = rolColors[u.rol] || rolColors.USUARIO;
+    var rBg    = rolBgs[u.rol]    || rolBgs.USUARIO;
     html += '<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px;margin-bottom:4px">';
-    html += '<div style="flex:1;font-size:13px;color:#1a2540">' + u.email;
+    html += '<div style="flex:1;font-size:12px;color:#1a2540;font-family:monospace">' + u.email;
     if (isMe) html += ' <span style="font-size:10px;color:#1B3F8B">(tú)</span>';
     html += '</div>';
-    html += '<select data-email="' + u.email + '" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rolColor + ';background:' + rolBg + ';outline:none;cursor:pointer"' + (isMe ? ' disabled' : '') + '>';
-    html += '<option value="USUARIO"' + (u.rol === 'USUARIO' ? ' selected' : '') + '>USUARIO</option>';
-    html += '<option value="ADMIN"' + (u.rol === 'ADMIN' ? ' selected' : '') + '>ADMIN</option>';
+    html += '<select data-email="' + u.email + '" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rColor + ';background:' + rBg + ';outline:none;cursor:pointer"' + (isMe ? ' disabled' : '') + '>';
+    ROLES.forEach(function(r) {
+      html += '<option value="' + r + '"' + (u.rol === r ? ' selected' : '') + '>' + r.replace('_',' ') + '</option>';
+    });
     html += '</select>';
     if (!isMe) html += '<button data-email="' + u.email + '" onclick="removeUserAccessByEl(this)" style="background:none;border:none;color:#d63344;cursor:pointer;font-size:16px;padding:2px 6px;border-radius:4px" title="Eliminar">✕</button>';
     html += '</div>';
@@ -1322,14 +1325,22 @@ async function saveMaestros() {
       <button onclick="closeAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✕</button>
     </div>
     <div style="padding:20px 22px">
-      <p style="font-size:12px;color:#6a7a9a;margin-bottom:16px">Administra los usuarios que pueden acceder al sistema. Solo admins pueden ver este panel.</p>
+      <p style="font-size:12px;color:#6a7a9a;margin-bottom:8px">Administra los usuarios que pueden acceder al sistema.</p>
+      <div style="background:#f5f8ff;border:1px solid #d0daf0;border-radius:7px;padding:9px 12px;font-size:11px;color:#6a7a9a;line-height:1.7;margin-bottom:14px">
+        <strong style="color:#1a2540">TÉCNICO</strong> — accede a insumos, solicita salidas (requieren aprobación)<br>
+        <strong style="color:#6b3fa0">SUPERVISOR</strong> — aprueba solicitudes, registra salidas y transferencias directas<br>
+        <strong style="color:#1B3F8B">ADMIN</strong> — gestión completa excepto eliminar ítems del catálogo<br>
+        <strong style="color:#d4621a">SUPER ADMIN</strong> — acceso total sin restricciones
+      </div>
       
       <!-- Add user -->
       <div style="display:flex;gap:8px;margin-bottom:16px">
         <input type="email" id="new-user-email" placeholder="correo@ejemplo.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
         <select id="new-user-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
-          <option value="USUARIO">USUARIO</option>
+          <option value="TECNICO">TÉCNICO</option>
+          <option value="SUPERVISOR">SUPERVISOR</option>
           <option value="ADMIN">ADMIN</option>
+          <option value="SUPER_ADMIN">SUPER ADMIN</option>
         </select>
         <button onclick="addUserAccess()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Agregar</button>
       </div>

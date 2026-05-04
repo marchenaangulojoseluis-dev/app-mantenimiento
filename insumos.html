@@ -36,6 +36,20 @@ header{background:#1B3F8B;padding:0 20px;height:56px;display:flex;align-items:ce
 .role-ADMIN{background:#e8eef8;color:var(--blue)}
 .role-SUPERVISOR{background:var(--purple-bg);color:var(--purple)}
 .role-TECNICO{background:var(--green-bg);color:var(--green)}
+/* USER PILL */
+.user-pill{display:flex;align-items:center;gap:8px;padding:4px 10px 4px 4px;border:1px solid rgba(255,255,255,.2);border-radius:20px;cursor:pointer;position:relative}
+.user-pill:hover{border-color:rgba(255,255,255,.5);background:rgba(255,255,255,.1)}
+.user-avatar-init{width:26px;height:26px;border-radius:50%;background:var(--orange);display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;color:#fff;flex-shrink:0}
+.user-avatar-img{width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0}
+.user-pname{font-size:11px;color:rgba(255,255,255,.85);font-weight:500;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.user-menu{display:none;position:absolute;top:calc(100% + 8px);right:0;background:#fff;border:1.5px solid var(--border);border-radius:10px;box-shadow:var(--shadow-lg);min-width:200px;overflow:hidden;z-index:999}
+.user-menu.open{display:block}
+.user-menu-head{padding:10px 14px 6px;font-size:10px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+.user-menu-item{display:flex;align-items:center;gap:8px;padding:10px 14px;font-size:12px;color:var(--accent);cursor:pointer;background:none;border:none;width:100%;text-align:left;font-family:var(--font);transition:background .15s}
+.user-menu-item:hover{background:var(--bg)}
+.user-menu-item.danger{color:var(--red)}
+.user-menu-item.danger:hover{background:var(--red-bg)}
+.user-menu-div{height:1px;background:var(--border);margin:4px 0}
 .app{display:flex;height:calc(100vh - 56px)}
 .sidebar{width:240px;min-width:240px;background:var(--surface);border-right:1px solid var(--border);display:flex;flex-direction:column;overflow-y:auto}
 .sb-section{padding:14px 14px 8px;font-size:10px;font-weight:700;letter-spacing:.12em;color:#1B3F8B;text-transform:uppercase;border-bottom:1px solid #d0daf0}
@@ -151,8 +165,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
   <div class="logo">MultiAire <span>/ Insumos</span></div>
   <div class="hpill loading" id="conn-pill">⟳ Conectando...</div>
   <div class="hactions">
-    <span id="role-display"></span>
-    <span id="user-pill" style="font-size:11px;color:rgba(255,255,255,.5);font-family:var(--mono)"></span>
+    <div id="user-pill" class="user-pill" style="display:none" onclick="toggleUserMenu()"></div>
     <button class="btn btn-sm" style="color:#fff;border-color:rgba(255,255,255,.25);background:rgba(255,255,255,.08)" onclick="location.href='index.html'">← Inicio</button>
   </div>
 </header>
@@ -358,6 +371,33 @@ tbody td{padding:9px 12px;vertical-align:middle}
   </div>
 </div>
 
+<!-- MODAL ACCESOS -->
+<div class="modal-overlay" id="modal-access">
+  <div class="modal">
+    <h2>⚙️ Gestión de accesos</h2>
+    <div class="modal-sub">
+      <strong>TÉCNICO</strong> — solo solicita salidas (requieren aprobación)<br>
+      <strong>SUPERVISOR</strong> — aprueba solicitudes, registra salidas/transferencias directas<br>
+      <strong>ADMIN</strong> — todo excepto eliminar ítems del catálogo<br>
+      <strong>SUPER_ADMIN</strong> — acceso total sin restricciones
+    </div>
+    <div id="access-list" style="max-height:300px;overflow-y:auto;margin-bottom:14px"></div>
+    <div style="display:flex;gap:8px;margin-bottom:4px">
+      <input type="text" class="form-input" id="new-user-email" placeholder="nuevo@email.com" style="flex:1">
+      <select class="form-select" id="new-user-rol" style="width:150px">
+        <option value="TECNICO">TÉCNICO</option>
+        <option value="SUPERVISOR">SUPERVISOR</option>
+        <option value="ADMIN">ADMIN</option>
+        <option value="SUPER_ADMIN">SUPER ADMIN</option>
+      </select>
+      <button class="btn btn-primary" onclick="addUser()">+ Agregar</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-access')">Cerrar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="firebase-config.js"></script>
@@ -391,13 +431,92 @@ auth.onAuthStateChanged(async user=>{
   if(!snap.exists){auth.signOut();location.href='index.html';return;}
   maUser={email:user.email,...snap.data()};
   if(!PERMS[maUser.rol]) maUser.rol='TECNICO';
-  document.getElementById('user-pill').textContent=maUser.email;
-  document.getElementById('role-display').innerHTML=`<span class="role-badge role-${maUser.rol}">${maUser.rol.replace('_',' ')}</span>`;
+  renderUserPill();
   document.getElementById('conn-pill').textContent='✓ Conectado';
   document.getElementById('conn-pill').className='hpill ok';
   buildSidebar();
   await loadAll();
 });
+
+function renderUserPill(){
+  const pill=document.getElementById('user-pill');if(!pill||!maUser)return;
+  const n=maUser.nombre||maUser.name||maUser.email;
+  const init=n.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase();
+  const avatar=maUser.picture?`<img class="user-avatar-img" src="${maUser.picture}">`:`<div class="user-avatar-init">${init}</div>`;
+  const rolBadge=`<span class="role-badge role-${maUser.rol}">${maUser.rol.replace('_',' ')}</span>`;
+  const adminItem=can('aprobar')||maUser.rol==='ADMIN'||maUser.rol==='SUPER_ADMIN'?`<button class="user-menu-item" onclick="openAccessPanel()">⚙️ Gestión de accesos</button><div class="user-menu-div"></div>`:'';
+  pill.innerHTML=avatar+`<span class="user-pname">${n}</span>`
+    +`<div class="user-menu" id="user-menu">`
+    +`<div class="user-menu-head">${maUser.email} ${rolBadge}</div>`
+    +`<div class="user-menu-div"></div>`
+    +adminItem
+    +`<button class="user-menu-item danger" onclick="maSignOut()">→ Cerrar sesión</button>`
+    +`</div>`;
+  pill.style.display='flex';
+}
+
+function toggleUserMenu(){
+  const m=document.getElementById('user-menu');if(m)m.classList.toggle('open');
+}
+function maSignOut(){auth.signOut().then(()=>{location.href='index.html';});}
+
+document.addEventListener('click',e=>{
+  const pill=document.getElementById('user-pill');
+  const menu=document.getElementById('user-menu');
+  if(menu&&pill&&!pill.contains(e.target))menu.classList.remove('open');
+});
+
+// ── PANEL DE ACCESOS ─────────────────────────────────────────────────────────
+let accessUsers=[];
+async function openAccessPanel(){
+  document.getElementById('user-menu')?.classList.remove('open');
+  const snap=await db.collection('usuarios').get();
+  accessUsers=snap.docs.map(d=>({id:d.id,...d.data()}));
+  renderAccessPanel();
+  document.getElementById('modal-access').classList.add('open');
+}
+function renderAccessPanel(){
+  const list=document.getElementById('access-list');
+  if(!accessUsers.length){list.innerHTML='<div style="text-align:center;color:var(--muted);padding:16px;font-size:12px">Sin usuarios</div>';return;}
+  const ROLES=['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'];
+  list.innerHTML=accessUsers.map(u=>{
+    const isMe=u.email===maUser.email;
+    const opts=ROLES.map(r=>`<option value="${r}"${u.rol===r?' selected':''}>${r.replace('_',' ')}</option>`).join('');
+    return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border);font-size:12px">
+      <div style="flex:1;font-family:var(--mono);font-size:11px">${u.email}</div>
+      <select style="width:140px;font-size:11px;padding:4px 8px" ${isMe?'disabled':''} onchange="changeUserRol('${u.email}',this.value)">
+        ${opts}
+      </select>
+      ${!isMe?`<button class="btn btn-sm btn-red" onclick="deleteUser('${u.email}')">🗑</button>`:'<span style="width:34px"></span>'}
+    </div>`;
+  }).join('');
+}
+async function changeUserRol(email,rol){
+  try{
+    await db.collection('usuarios').doc(email).update({rol});
+    const u=accessUsers.find(x=>x.email===email);if(u)u.rol=rol;
+    toast('Rol actualizado','ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+async function deleteUser(email){
+  if(!confirm(`¿Eliminar acceso de ${email}?`))return;
+  try{
+    await db.collection('usuarios').doc(email).delete();
+    accessUsers=accessUsers.filter(x=>x.email!==email);
+    renderAccessPanel();toast('Usuario eliminado','ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
+async function addUser(){
+  const email=document.getElementById('new-user-email').value.trim().toLowerCase();
+  const rol=document.getElementById('new-user-rol').value;
+  if(!email||!email.includes('@')){toast('Email inválido','err');return;}
+  try{
+    await db.collection('usuarios').doc(email).set({email,rol});
+    accessUsers.push({email,rol});
+    document.getElementById('new-user-email').value='';
+    renderAccessPanel();toast('Usuario agregado','ok');
+  }catch(e){toast('Error: '+e.message,'err');}
+}
 
 function buildSidebar(){
   let h='';
@@ -413,20 +532,23 @@ function buildSidebar(){
 
 async function loadAll(){
   try{
-    const [catS,movS,stockS,invS,persS,paqS]=await Promise.all([
+    const [catS,movS,stockS,tiendasS,persS,paqS]=await Promise.all([
       db.collection('insumos_catalogo').get(),
       db.collection('insumos_movimientos').orderBy('fecha','desc').limit(200).get(),
       db.collection('insumos_stock').get(),
-      db.collection('inventario').get(),
+      db.collection('maestros_tiendas').get(),  // ← fuente correcta de sedes
       db.collection('maestros_personal').get(),
       db.collection('insumos_paquetes').get(),
     ]);
     catalogoData=catS.docs.map(d=>({id:d.id,...d.data()}));
     movimientosData=movS.docs.map(d=>({id:d.id,...d.data()}));
     stockData={};stockS.docs.forEach(d=>{stockData[d.id]=d.data();});
-    const sedeMap={};
-    invS.docs.forEach(d=>{const{sede,cliente}=d.data();if(sede)sedeMap[sede]=cliente||'MULTIAIRE';});
-    sedes=Object.entries(sedeMap).map(([sede,cliente])=>({sede,cliente})).sort((a,b)=>a.sede.localeCompare(b.sede));
+    // Sedes activas de maestros_tiendas, agrupadas por cliente
+    sedes=tiendasS.docs
+      .map(d=>d.data())
+      .filter(t=>String(t.activo||'SI').toUpperCase()!=='NO'&&t.sede)
+      .map(t=>({sede:String(t.sede).trim().toUpperCase(),cliente:String(t.cliente||'MULTIAIRE').trim().toUpperCase()}))
+      .sort((a,b)=>a.sede.localeCompare(b.sede));
     personalData=persS.docs.map(d=>d.data()).filter(p=>String(p.activo||'SI').toUpperCase()!=='NO');
     paquetesData=paqS.docs.map(d=>({id:d.id,...d.data()}));
     populateSedes();
@@ -706,7 +828,7 @@ function openModalMovimiento(itemId,tipo){
   if(itemId)document.getElementById('fm-item').value=itemId;
   document.getElementById('fm-sede').innerHTML=sedeOpts(false);
   const pOpts=personalData.map(p=>`<option value="${p.nombre}">${p.nombre} (${p.cargo||'TÉCNICO'})</option>`).join('');
-  document.getElementById('fm-personal').innerHTML=`<option value="">—</option>${pOpts}<option value="${maUser.email}">${maUser.email}</option>`;
+  document.getElementById('fm-personal').innerHTML=`<option value="">—</option>${pOpts}`;
   document.getElementById('fm-qty').value='';document.getElementById('fm-motivo').value='';
   document.getElementById('stock-info-bar').style.display='none';
   document.getElementById('modal-mov').classList.add('open');
@@ -869,7 +991,7 @@ function openModalApplyPaquete(paqId){
   document.getElementById('modal-apply-title').textContent=`Aplicar: ${paq.nombre}`;
   document.getElementById('fap-sede').innerHTML=sedeOpts(false);
   const pOpts=personalData.map(p=>`<option value="${p.nombre}">${p.nombre}</option>`).join('');
-  document.getElementById('fap-personal').innerHTML=`<option value="">—</option>${pOpts}<option value="${maUser.email}">${maUser.email}</option>`;
+  document.getElementById('fap-personal').innerHTML=`<option value="">—</option>${pOpts}`;
   document.getElementById('fap-obs').value='';
   const prev=(paq.items||[]).map(it=>{const c=catalogoData.find(x=>x.id===it.itemId);return`<strong>${c?.nombre||it.itemId}</strong>: −${it.cantidad} ${c?.unidad||'UND'}`;}).join('<br>');
   document.getElementById('apply-paq-preview').innerHTML=prev||'Sin ítems';

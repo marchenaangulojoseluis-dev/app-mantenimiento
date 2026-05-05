@@ -804,6 +804,7 @@ async function doSave() {
     await setDoc(doc(window.__db, 'mantenimiento', key), {
       clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
     });
+    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus }));
     if(ind){ ind.classList.remove('show'); ind.classList.add('saved'); ind.innerHTML = '✓ Guardado'; }
     setTimeout(() => { if(ind){ ind.classList.remove('saved'); ind.innerHTML = '<div class="spin"></div> Guardando...'; } }, 2000);
   } catch(e) {

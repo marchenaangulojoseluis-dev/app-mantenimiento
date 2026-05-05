@@ -172,7 +172,7 @@ option{background:#fff}
 .save-btn{display:flex;align-items:center;gap:5px;padding:5px 12px;border-radius:5px;border:1px solid var(--border2);background:var(--surface2);color:var(--muted2);font-family:var(--mono);font-size:10px;font-weight:700;cursor:pointer;transition:all .15s;letter-spacing:.05em;white-space:nowrap;flex-shrink:0}
 .save-btn:hover{border-color:var(--blue);color:var(--blue);background:var(--blue-bg)}
 .save-btn.saved{border-color:var(--green-border);color:var(--green);background:var(--green-bg)}
-.save-btn.saving{border-color:var(--yellow-border);color:var(--yellow);background:var(--yellow-bg)}
+.save-btn.saving{border-color:var(--yellow-border);color:var(--yellow);background:var(--yellow-bg)}.saving.saved{color:#7fffb0}
 .tareas-footer{display:flex;justify-content:flex-end;margin-top:6px;margin-left:36px}
 
 /* MODAL selección equipos */
@@ -679,7 +679,7 @@ function renderEquipo(eq, tareas) {
         <span class="tarea-label">${t}</span>
         ${peso}
       </label>`;
-    }).join('') + `</div><div class="tareas-footer"><button class="save-btn" id="savebtn-${eq.eq_id}" onclick="saveNow('${eq.eq_id}')">💾 GUARDAR</button></div>`;
+    }).join('') + `</div>`;
   }
 
   const pct = getPct(eq);
@@ -742,7 +742,7 @@ function markDirty(eqId) {
   scheduleSave();
 }
 
-async function saveNow(eqId) {
+async function saveNow(eqId) { /* autosave — button removed */ return;
   const btn = document.getElementById('savebtn-' + eqId);
   if(btn){ btn.classList.add('saving'); btn.textContent = '⟳ Guardando...'; btn.disabled = true; }
   const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
@@ -791,22 +791,25 @@ function updateStats() {
 // ── SAVE ─────────────────────────────────────────────────────────────────────
 function scheduleSave() {
   clearTimeout(saveTimeout);
-  document.getElementById('savingInd').classList.add('show');
+  const ind = document.getElementById('savingInd');
+  if(ind){ ind.classList.add('show'); ind.classList.remove('saved'); ind.innerHTML = '<div class="spin"></div> Guardando...'; }
   saveTimeout = setTimeout(doSave, 800);
 }
 
 async function doSave() {
   const key = currentSede + '|' + currentPeriodo + '|' + currentAnio;
+  const ind = document.getElementById('savingInd');
   try {
     const { setDoc, doc } = window.__fb;
     await setDoc(doc(window.__db, 'mantenimiento', key), {
       clave: key, seleccionados, tareaStatus, updatedAt: new Date().toISOString()
     });
-    toast('Guardado ✓', 'ok');
+    if(ind){ ind.classList.remove('show'); ind.classList.add('saved'); ind.innerHTML = '✓ Guardado'; }
+    setTimeout(() => { if(ind){ ind.classList.remove('saved'); ind.innerHTML = '<div class="spin"></div> Guardando...'; } }, 2000);
   } catch(e) {
     toast('Error al guardar', 'err');
+    if(ind) ind.classList.remove('show');
   }
-  document.getElementById('savingInd').classList.remove('show');
 }
 
 // ── SELECCIÓN DE EQUIPOS ──────────────────────────────────────────────────────

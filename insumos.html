@@ -1375,9 +1375,8 @@ function switchTab(tab,btn){
 function closeModal(id){
   const el = document.getElementById(id);
   if(!el) return;
-  el.classList.remove('open');
   el.style.display = 'none';
-  setTimeout(() => { el.style.display = ''; }, 50);
+  el.classList.remove('open');
 }
 function toast(msg,type){
   const el=document.getElementById('toast');el.textContent=msg;
@@ -1679,7 +1678,8 @@ function closeScanner() {
       html5QrScanner = null;
     }).catch(() => { html5QrScanner = null; });
   }
-  document.getElementById('modal-scanner').classList.remove('open');
+  const el = document.getElementById('modal-scanner');
+  if(el){ el.style.display = 'none'; el.classList.remove('open'); }
 }
 </script>
 </body>

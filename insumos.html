@@ -1384,11 +1384,11 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 </script>
 
 <!-- MODAL QR -->
-<div class="modal-overlay" id="modal-qr">
+<div class="modal-overlay" id="modal-qr" onclick="if(event.target===this)closeModal('modal-qr')">
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
       <div class="modal-title">▣ Código QR del ítem</div>
-      <button class="modal-close" onclick="closeModal('modal-qr')">✕</button>
+      <button class="modal-close" onclick="event.stopPropagation();closeModal('modal-qr')">✕</button>
     </div>
     <div class="modal-body">
       <div class="modal-qr-wrap">
@@ -1407,11 +1407,11 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
 </div>
 
 <!-- MODAL ESCÁNER -->
-<div class="modal-overlay" id="modal-scanner">
+<div class="modal-overlay" id="modal-scanner" onclick="if(event.target===this)closeScanner()">
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div class="modal-title">📷 Escanear QR</div>
-      <button class="modal-close" onclick="closeScanner()">✕</button>
+      <button class="modal-close" onclick="event.stopPropagation();closeScanner()">✕</button>
     </div>
     <div class="modal-body">
       <div class="scanner-modal-body">

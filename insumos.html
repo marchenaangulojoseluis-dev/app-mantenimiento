@@ -1388,7 +1388,7 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
   <div class="modal" style="max-width:400px">
     <div class="modal-header">
       <div class="modal-title">▣ Código QR del ítem</div>
-      <button class="modal-close" onclick="event.stopPropagation();closeModal('modal-qr')">✕</button>
+      <button onclick="closeModal('modal-qr')" style="min-width:44px;min-height:44px;border-radius:8px;border:1.5px solid var(--border);background:var(--red-bg);color:var(--red);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">✕</button>
     </div>
     <div class="modal-body">
       <div class="modal-qr-wrap">
@@ -1399,7 +1399,7 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
         </div>
         <div class="qr-actions">
           <button class="btn btn-primary" onclick="exportQRLabel()">⬇ Descargar etiqueta</button>
-          <button class="btn" onclick="closeModal('modal-qr')">Cerrar</button>
+          <button class="btn" onclick="closeModal('modal-qr')" style="min-height:44px">Cerrar</button>
         </div>
       </div>
     </div>
@@ -1411,7 +1411,7 @@ document.querySelectorAll('.modal-overlay').forEach(o=>{
   <div class="modal" style="max-width:440px">
     <div class="modal-header">
       <div class="modal-title">📷 Escanear QR</div>
-      <button class="modal-close" onclick="event.stopPropagation();closeScanner()">✕</button>
+      <button onclick="closeScanner()" style="min-width:44px;min-height:44px;border-radius:8px;border:1.5px solid var(--border);background:var(--red-bg);color:var(--red);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-tap-highlight-color:transparent">✕</button>
     </div>
     <div class="modal-body">
       <div class="scanner-modal-body">

@@ -1593,10 +1593,11 @@ function showMsg(msg, tipo) {
   setTimeout(() => el.classList.remove('show'), 3400);
 }
 async function cargarDatosPrueba() {
-  if (!confirm('¿Cargar datos de prueba?\nSe crearán ítems de catálogo e instancias físicas en Firebase.')) return;
+  if (!confirm('¿Cargar datos de prueba?\nSe crearán ítems, instancias y paquetes en Firebase.')) return;
   showMsg('Cargando datos...');
   try {
     const ts = new Date().toISOString();
+
     // Catálogo
     const items = [
       { id: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', categoria: 'HERRAMIENTA', unidad: 'UND', tipoCantidad: 'UNIDAD', codigo: 'ESC6', stockMin: 1 },
@@ -1610,25 +1611,25 @@ async function cargarDatosPrueba() {
       await db.collection('insumos_catalogo').doc(item.id).set({...item, creadoEn: ts, creadoPor: maUser.email});
     }
 
-    // Instancias físicas
+    // Instancias físicas (algunas asignadas a paquetes)
     const instancias = [
-      // Escaleras 6 pasos
-      { id: 'ESC6-001', itemId: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', sede: 'OFICINA', estado: 'DISPONIBLE' },
-      { id: 'ESC6-002', itemId: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', sede: 'JOCKEY PLAZA', estado: 'EN_USO' },
+      // Escaleras 6 pasos — ESC6-001 y ESC6-002 van en paquetes
+      { id: 'ESC6-001', itemId: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', sede: 'OFICINA', estado: 'DISPONIBLE', paqueteId: 'PKG-001' },
+      { id: 'ESC6-002', itemId: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', sede: 'JOCKEY PLAZA', estado: 'EN_USO', paqueteId: 'PKG-002' },
       { id: 'ESC6-003', itemId: 'HERR-ESC6', nombre: 'ESCALERA 6 PASOS', sede: 'MIRAFLORES', estado: 'DISPONIBLE' },
       // Escaleras 8 pasos
-      { id: 'ESC8-001', itemId: 'HERR-ESC8', nombre: 'ESCALERA 8 PASOS', sede: 'OFICINA', estado: 'DISPONIBLE' },
+      { id: 'ESC8-001', itemId: 'HERR-ESC8', nombre: 'ESCALERA 8 PASOS', sede: 'OFICINA', estado: 'DISPONIBLE', paqueteId: 'PKG-001' },
       { id: 'ESC8-002', itemId: 'HERR-ESC8', nombre: 'ESCALERA 8 PASOS', sede: 'SANTA ANITA', estado: 'MANTENIMIENTO', notas: 'Peldaño roto' },
       // Martillos
-      { id: 'MRT-001', itemId: 'HERR-MRT', nombre: 'MARTILLO', sede: 'OFICINA', estado: 'DISPONIBLE' },
-      { id: 'MRT-002', itemId: 'HERR-MRT', nombre: 'MARTILLO', sede: 'JOCKEY PLAZA', estado: 'DISPONIBLE' },
+      { id: 'MRT-001', itemId: 'HERR-MRT', nombre: 'MARTILLO', sede: 'OFICINA', estado: 'DISPONIBLE', paqueteId: 'PKG-001' },
+      { id: 'MRT-002', itemId: 'HERR-MRT', nombre: 'MARTILLO', sede: 'JOCKEY PLAZA', estado: 'DISPONIBLE', paqueteId: 'PKG-002' },
       { id: 'MRT-003', itemId: 'HERR-MRT', nombre: 'MARTILLO', sede: 'MIRAFLORES', estado: 'DETERIORADO', notas: 'Mango partido' },
       // Desarmadores
-      { id: 'DES-001', itemId: 'HERR-DES', nombre: 'DESARMADOR SET', sede: 'OFICINA', estado: 'DISPONIBLE' },
+      { id: 'DES-001', itemId: 'HERR-DES', nombre: 'DESARMADOR SET', sede: 'OFICINA', estado: 'DISPONIBLE', paqueteId: 'PKG-001' },
       { id: 'DES-002', itemId: 'HERR-DES', nombre: 'DESARMADOR SET', sede: 'SANTA ANITA', estado: 'DISPONIBLE' },
-      // Refrigerantes
-      { id: 'REF-001', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'OFICINA', estado: 'DISPONIBLE', nivel: 100 },
-      { id: 'REF-002', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'JOCKEY PLAZA', estado: 'DISPONIBLE', nivel: 50 },
+      // Refrigerantes — REF-001 en paquete
+      { id: 'REF-001', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'OFICINA', estado: 'DISPONIBLE', nivel: 100, paqueteId: 'PKG-001' },
+      { id: 'REF-002', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'JOCKEY PLAZA', estado: 'DISPONIBLE', nivel: 50, paqueteId: 'PKG-002' },
       { id: 'REF-003', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'MIRAFLORES', estado: 'DISPONIBLE', nivel: 25 },
       { id: 'REF-004', itemId: 'INSU-REF', nombre: 'REFRIGERANTE R410A', sede: 'SANTA ANITA', estado: 'DISPONIBLE', nivel: 75 },
       // Aceites
@@ -1638,7 +1639,48 @@ async function cargarDatosPrueba() {
     for (const inst of instancias) {
       await db.collection('insumos_instancias').doc(inst.id).set({...inst, creadoEn: ts, creadoPor: maUser.email});
     }
-    showMsg(`✓ ${items.length} tipos y ${instancias.length} instancias cargadas`, 'ok');
+
+    // Paquetes (contenedores físicos)
+    const paquetes = [
+      {
+        id: 'PKG-001',
+        nombre: 'MOCHILA TÉCNICO A',
+        tipo: 'MOCHILA',
+        sede: 'OFICINA',
+        responsable: 'JOSE MARCHENA',
+        estado: 'ACTIVO',
+        instancias: ['ESC6-001', 'ESC8-001', 'MRT-001', 'DES-001', 'REF-001'],
+        notas: 'Kit completo de mantenimiento Fan Coil',
+        creadoEn: ts, creadoPor: maUser.email
+      },
+      {
+        id: 'PKG-002',
+        nombre: 'CAJA HERRAMIENTAS B',
+        tipo: 'CAJA',
+        sede: 'JOCKEY PLAZA',
+        responsable: 'HERNAN ZAVALETA',
+        estado: 'ACTIVO',
+        instancias: ['ESC6-002', 'MRT-002', 'REF-002'],
+        notas: 'Herramientas básicas sede Jockey Plaza',
+        creadoEn: ts, creadoPor: maUser.email
+      },
+      {
+        id: 'PKG-003',
+        nombre: 'ANAQUEL MIRAFLORES',
+        tipo: 'ANAQUEL',
+        sede: 'MIRAFLORES',
+        responsable: 'ENRIQUE YARANGA',
+        estado: 'INACTIVO',
+        instancias: [],
+        notas: 'Anaquel sin asignación actual',
+        creadoEn: ts, creadoPor: maUser.email
+      },
+    ];
+    for (const pkg of paquetes) {
+      await db.collection('insumos_paquetes').doc(pkg.id).set(pkg);
+    }
+
+    showMsg(`✓ ${items.length} tipos, ${instancias.length} instancias y ${paquetes.length} paquetes cargados`, 'ok');
     await loadAll();
   } catch(e) { showMsg('Error: ' + e.message, 'err'); }
 }
@@ -1650,12 +1692,12 @@ async function resetearBaseDatos() {
   const showMsg = (msg) => { if(toastEl){ toastEl.textContent=msg; toastEl.className='toast show'; setTimeout(()=>toastEl.classList.remove('show'),3000); }};
   try {
     showMsg('Reseteando...');
-    const colecciones = ['insumos_catalogo','insumos_instancias','insumos_movimientos','insumos_stock'];
+    const colecciones = ['insumos_catalogo','insumos_instancias','insumos_movimientos','insumos_stock','insumos_paquetes'];
     for (const col of colecciones) {
       const snap = await db.collection(col).get();
       for (const doc of snap.docs) await doc.ref.delete();
     }
-    catalogoData = []; instanciasData = []; movimientosData = []; stockData = {};
+    catalogoData = []; instanciasData = []; movimientosData = []; stockData = {}; paquetesData = [];
     showMsg('✓ Base de datos reseteada');
     renderAll();
   } catch(e) { showMsg('Error: ' + e.message); console.error(e); }

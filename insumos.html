@@ -706,6 +706,11 @@ tbody td{padding:9px 12px;vertical-align:middle}
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);background:var(--surface2);padding:8px 12px;border-radius:6px" id="em-info"></div>
+      <!-- Instancias afectadas (readonly) para ENTRADA/SALIDA/BAJA -->
+      <div id="em-instancias-wrap" style="display:none">
+        <div class="form-label">Instancias afectadas</div>
+        <div id="em-instancias-list" style="background:var(--surface2);border:1px solid var(--border);border-radius:6px;padding:8px 10px;font-family:var(--mono);font-size:11px;color:var(--accent);line-height:1.8"></div>
+      </div>
       <!-- Campos extra para ACTUALIZACION -->
       <div id="em-actualizacion-fields" style="display:none;flex-direction:column;gap:12px">
         <div id="em-estado-wrap" style="display:none" class="form-group full">
@@ -2583,6 +2588,26 @@ async function editarMovimiento(movId) {
   nivelWrap.style.display = 'none';
   sedeWrap.style.display = 'none';
 
+  // Instancias afectadas para ENTRADA / SALIDA / BAJA
+  const instWrap = document.getElementById('em-instancias-wrap');
+  const instList = document.getElementById('em-instancias-list');
+  if (mov.tipo === 'ENTRADA' && (mov.instancias?.length || mov.instanciaId)) {
+    const ids = mov.instancias || [mov.instanciaId];
+    instList.innerHTML = ids.map(id => {
+      const inst = instanciasData.find(x => x.id === id);
+      const estado = inst ? `<span style="color:var(--muted2)"> · ${inst.estado||'DISPONIBLE'}</span>` : `<span style="color:var(--red)"> · eliminada</span>`;
+      return `<div>${id}${estado}</div>`;
+    }).join('');
+    instWrap.style.display = 'block';
+  } else if ((mov.tipo === 'SALIDA' || mov.tipo === 'BAJA') && mov.instanciaId) {
+    const inst = instanciasData.find(x => x.id === mov.instanciaId);
+    const estado = inst ? `<span style="color:var(--muted2)"> · ${inst.estado||'DISPONIBLE'} · ${inst.sede||'—'}</span>` : `<span style="color:var(--red)"> · ya no existe en inventario</span>`;
+    instList.innerHTML = `<div>${mov.instanciaId}${estado}</div>`;
+    instWrap.style.display = 'block';
+  } else {
+    instWrap.style.display = 'none';
+  }
+
   if (mov.tipo === 'ACTUALIZACION' && mov.diffsData && mov.diffsData.length) {
     extraWrap.style.display = 'flex';
     mov.diffsData.forEach(d => {
@@ -2620,7 +2645,27 @@ async function guardarEdicionMovimiento() {
     const movUpdates = { responsable, motivo };
 
     // Si es ACTUALIZACION, aplicar cambios editados a la instancia
-    if (mov.tipo === 'ACTUALIZACION' && mov.diffsData && mov.diffsData.length) {
+    // Instancias afectadas para ENTRADA / SALIDA / BAJA
+  const instWrap = document.getElementById('em-instancias-wrap');
+  const instList = document.getElementById('em-instancias-list');
+  if (mov.tipo === 'ENTRADA' && (mov.instancias?.length || mov.instanciaId)) {
+    const ids = mov.instancias || [mov.instanciaId];
+    instList.innerHTML = ids.map(id => {
+      const inst = instanciasData.find(x => x.id === id);
+      const estado = inst ? `<span style="color:var(--muted2)"> · ${inst.estado||'DISPONIBLE'}</span>` : `<span style="color:var(--red)"> · eliminada</span>`;
+      return `<div>${id}${estado}</div>`;
+    }).join('');
+    instWrap.style.display = 'block';
+  } else if ((mov.tipo === 'SALIDA' || mov.tipo === 'BAJA') && mov.instanciaId) {
+    const inst = instanciasData.find(x => x.id === mov.instanciaId);
+    const estado = inst ? `<span style="color:var(--muted2)"> · ${inst.estado||'DISPONIBLE'} · ${inst.sede||'—'}</span>` : `<span style="color:var(--red)"> · ya no existe en inventario</span>`;
+    instList.innerHTML = `<div>${mov.instanciaId}${estado}</div>`;
+    instWrap.style.display = 'block';
+  } else {
+    instWrap.style.display = 'none';
+  }
+
+  if (mov.tipo === 'ACTUALIZACION' && mov.diffsData && mov.diffsData.length) {
       const instId = mov.instanciaId;
       const instUpdates = { updatedAt: new Date().toISOString(), updatedBy: maUser.email };
       const newDiffs = [];

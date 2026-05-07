@@ -408,7 +408,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
     <h2 id="modal-insumo-title">Nuevo ítem</h2>
     <div class="modal-sub">El stock inicial se registra después como una <strong>Entrada</strong> desde el sidebar.</div>
     <div class="form-grid">
-      <div class="form-group full"><div class="form-label">Nombre *</div><input type="text" class="form-input" id="fi-nombre" placeholder="Ej: Filtro de aire G4 24x24"></div>
+      <div class="form-group full"><div class="form-label">Nombre *</div><input type="text" class="form-input" id="fi-nombre" placeholder="Ej: FILTRO DE AIRE G4 24X24" style="text-transform:uppercase"></div>
       <div class="form-group"><div class="form-label">Categoría *</div>
         <select class="form-select" id="fi-cat">
           <option value="INSUMO">🔧 Insumo (consumible)</option>
@@ -1261,7 +1261,7 @@ function openModalInsumo(id){
 }
 
 async function saveInsumo(){
-  const nombre=document.getElementById('fi-nombre').value.trim();
+  const nombre=document.getElementById('fi-nombre').value.trim().toUpperCase();
   const codigo=document.getElementById('fi-codigo').value.trim().toUpperCase();
   if(!nombre){toast('Nombre obligatorio','err');return;}
   if(!codigo){toast('El código es obligatorio','err');return;}
@@ -1646,7 +1646,7 @@ async function saveEntrada() {
       const id = `${prefix}-${String(next + i).padStart(3, '0')}`;
       const snap = await db.collection('insumos_instancias').doc(id).get();
       if (snap.exists) { next++; i--; continue; }
-      const inst = { itemId, nombre: item.nombre, sede, estado: 'DISPONIBLE',
+      const inst = { itemId, nombre: item.nombre.toUpperCase(), sede, estado: 'DISPONIBLE',
         creadoEn: new Date().toISOString(), creadoPor: maUser.email,
         ...(item.tipoCantidad === 'RANGO' && { nivel: 100 }) };
       await db.collection('insumos_instancias').doc(id).set(inst);
@@ -1968,7 +1968,7 @@ async function saveInstancia() {
   if (!esUnico) { toast('El ID ya existe, usa otro', 'err'); return; }
   const item = catalogoData.find(x => x.id === itemId);
   const nivel = (item && item.tipoCantidad === 'RANGO') ? Number(document.getElementById('fi-inst-nivel').value) : null;
-  const instancia = { itemId, nombre: item ? item.nombre : '', sede, estado: 'DISPONIBLE',
+  const instancia = { itemId, nombre: item ? item.nombre.toUpperCase() : '', sede, estado: 'DISPONIBLE',
     notas: document.getElementById('fi-inst-notas').value.trim(),
     creadoEn: new Date().toISOString(), creadoPor: maUser.email,
     ...(nivel !== null && { nivel }) };

@@ -1196,18 +1196,19 @@ function renderStockSede(){
         const q=sEnSede(i.id,sede);
         const canEdit=can('editarItem');
         if(i.tipoCantidad==='RANGO'){
-          // Nivel promedio real de instancias en esta sede
-          const instsSede = instanciasData.filter(x => x.itemId === i.id && x.sede === sede && x.nivel !== undefined && x.estado !== 'BAJA');
-          const nivelProm = instsSede.length ? Math.round(instsSede.reduce((a,x)=>a+(x.nivel||0),0)/instsSede.length) : 0;
-          const cantLabel = `${q} ${i.unidad||'UND'}`;
-          const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" 
-            ontouchend="openRangoDesde('${i.id}','${sede}')" 
-            onclick="openRangoDesde('${i.id}','${sede}')">📊 Nivel</button>`:'';
-          return`<div class="sede-stock-item">
-            <span style="flex:1">${i.nombre} <span style="color:var(--muted2);font-size:10px">(${cantLabel})</span></span>
-            ${renderRangoBadgeSede(nivelProm)}
-            ${editBtn}
-          </div>`;
+          const instsDeEste = instanciasData.filter(x => x.itemId === i.id && x.sede === sede && x.estado !== 'BAJA');
+          if(!instsDeEste.length) return '';
+          const header = `<div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 2px">${i.nombre}</div>`;
+          const rows = instsDeEste.map(inst=>{
+            const niv = inst.nivel !== undefined ? inst.nivel : 0;
+            const editBtn = canEdit ? `<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" onclick="openEditInstancia('${inst.id}')">✏️ Nivel</button>` : '';
+            return `<div class="sede-stock-item">
+              <span style="flex:1;font-family:var(--mono);font-size:11px;font-weight:600">${inst.id}</span>
+              ${renderRangoBadgeSede(niv)}
+              ${editBtn}
+            </div>`;
+          }).join('');
+          return header + rows;
         }
         const n=q<=0?'stock-out':(Number(i.stockMin)>0&&q<=Number(i.stockMin))?'stock-low':'stock-ok';
         const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0"

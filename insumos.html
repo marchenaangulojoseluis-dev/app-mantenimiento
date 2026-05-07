@@ -1099,7 +1099,7 @@ function renderInstancias() {
 
   wrap.innerHTML = `<table><thead><tr>
     <th style='width:32px'><input type='checkbox' id='inst-chk-all' onchange='toggleAllInstQR(this.checked)' title='Seleccionar todos'></th>
-    <th>ID / QR</th><th>Tipo</th><th>Sede</th><th>Nivel</th><th>Estado</th><th></th>
+    <th>ID / QR</th><th>Tipo</th><th>Sede</th><th>Nivel</th><th>Estado</th><th>Notas</th><th></th>
   </tr></thead><tbody>
   ${list.map(inst => {
     const item = catalogoData.find(x => x.id === inst.itemId);
@@ -1114,6 +1114,7 @@ function renderInstancias() {
       <td style="font-size:11px">${inst.sede || '—'}</td>
       <td>${nivelHtml}</td>
       <td><span class="stock-pill stock-${estColor}" style="font-size:9px">${estadoLabel[est]||est}</span></td>
+      <td style="font-size:11px;color:var(--muted2);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${inst.notas||''}">${inst.notas||'—'}</td>
       <td><div style="display:flex;gap:4px">
         <button class="btn btn-sm" onclick="openQRModal('${inst.id}')" title="Ver QR">▣</button>
         <button class="btn btn-sm" onclick="openEditInstancia('${inst.id}')">✏️</button>
@@ -1694,8 +1695,8 @@ function onQRScanned(code) {
       <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
         <button class="btn btn-sm btn-primary" onclick="closeScanner();openQRModal('${inst.id}')">▣ Ver QR</button>
         <button class="btn btn-sm btn-orange" onclick="closeScanner();openEditInstancia('${inst.id}')">✏️ Editar</button>
-        <button class="btn btn-sm" onclick="closeScanner();openModalSalida('SALIDA','${inst.id}')">⬆ Salida</button>
-        <button class="btn btn-sm" onclick="closeScanner();openModalTransferencia()">🔄 Transferir</button>
+        <button class="btn btn-sm" onclick="closeScanner();openModalSalidaDesdeScanner('${inst.id}')">⬆ Salida</button>
+        <button class="btn btn-sm" onclick="closeScanner();openModalTransferenciaDesdeScanner('${inst.id}')">🔄 Transferir</button>
       </div>`;
     infoBox.style.display = 'block';
   } else if (item) {
@@ -1714,6 +1715,28 @@ function onQRScanned(code) {
 async function closeScanner() {
   document.getElementById('modal-scanner').classList.remove('open');
   await destroyScanner();
+}
+
+async function openModalSalidaDesdeScanner(instId) {
+  openModalSalida('SALIDA');
+  // Esperar que el modal y las opciones estén en el DOM
+  await new Promise(r => setTimeout(r, 120));
+  const sel = document.getElementById('fsal-instancia');
+  if (sel) {
+    sel.value = instId;
+    onSalidaInstanciaChange();
+  }
+}
+
+async function openModalTransferenciaDesdeScanner(instId) {
+  openModalTransferencia();
+  // Esperar que el modal esté en el DOM con todas las instancias cargadas
+  await new Promise(r => setTimeout(r, 120));
+  const sel = document.getElementById('ft-instancia');
+  if (sel) {
+    sel.value = instId;
+    onTransfInstanciaChange();
+  }
 }
 
 // ── FUNCIONES UI BÁSICAS ──────────────────────────────────

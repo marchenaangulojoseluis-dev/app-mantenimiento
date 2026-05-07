@@ -1439,6 +1439,466 @@ function closeScanner() {
     }
   }
 }
+
+// ── FUNCIONES UI BÁSICAS ──────────────────────────────────
+function switchTab(tab, btn) {
+  document.querySelectorAll('.tab-view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-' + tab).classList.add('active');
+  btn.classList.add('active');
+}
+
+function closeModal(id) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.style.display = 'none';
+  el.classList.remove('open');
+}
+
+function toast(msg, tipo) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast show' + (tipo ? ' ' + tipo : '');
+  setTimeout(() => el.classList.remove('show'), 3400);
+}
+
+function toggleMobileSidebar() {
+  document.querySelector('.sidebar')?.classList.toggle('mobile-open');
+}
+
+// ── ENTRADA ───────────────────────────────────────────────
+let currentSalidaTipo = 'SALIDA';
+
+function openModalEntrada() {
+  const sel = document.getElementById('fent-tipo');
+  sel.innerHTML = '<option value="">Seleccionar...</option>' +
+    catalogoData.map(i => `<option value="${i.id}">${i.codigo ? i.codigo + ' — ' : ''}${i.nombre}</option>`).join('');
+  document.getElementById('fent-sede').innerHTML = sedeOpts(false);
+  document.getElementById('fent-qty').value = '1';
+  document.getElementById('fent-obs').value = '';
+  document.getElementById('fent-preview').style.display = 'none';
+  const pOpts = personalData.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  document.getElementById('fent-personal').innerHTML = `<option value="">—</option>${pOpts}`;
+  document.getElementById('modal-entrada').classList.add('open');
+}
+
+function onEntradaTipoChange() { previewInstancias(); }
+
+function previewInstancias() {
+  const itemId = document.getElementById('fent-tipo').value;
+  const qty = parseInt(document.getElementById('fent-qty').value) || 0;
+  const prev = document.getElementById('fent-preview');
+  if (!itemId || qty <= 0) { prev.style.display = 'none'; return; }
+  const item = catalogoData.find(x => x.id === itemId);
+  if (!item) return;
+  const prefix = (item.codigo || item.nombre.replace(/[^A-Z0-9]/gi, '')).substring(0, 3).toUpperCase();
+  const existing = instanciasData.filter(i => i.id.startsWith(prefix + '-')).map(i => parseInt(i.id.replace(prefix + '-', '')) || 0).sort((a, b) => b - a);
+  const next = (existing[0] || 0) + 1;
+  const ids = Array.from({length: qty}, (_, i) => `${prefix}-${String(next + i).padStart(3, '0')}`);
+  prev.style.display = 'block';
+  prev.innerHTML = `<div style="font-weight:600;margin-bottom:6px;color:var(--blue)">Se crearán ${qty} instancia${qty > 1 ? 's' : ''}:</div>` +
+    ids.map(id => `<div style="font-family:var(--mono);padding:2px 0">• ${id}</div>`).join('');
+}
+
+async function saveEntrada() {
+  const itemId = document.getElementById('fent-tipo').value;
+  const sede = document.getElementById('fent-sede').value;
+  const qty = parseInt(document.getElementById('fent-qty').value) || 0;
+  if (!itemId || !sede || qty <= 0) { toast('Completa todos los campos', 'err'); return; }
+  const item = catalogoData.find(x => x.id === itemId);
+  if (!item) return;
+  const prefix = (item.codigo || item.nombre.replace(/[^A-Z0-9]/gi, '')).substring(0, 3).toUpperCase();
+  const existing = instanciasData.filter(i => i.id.startsWith(prefix + '-')).map(i => parseInt(i.id.replace(prefix + '-', '')) || 0).sort((a, b) => b - a);
+  let next = (existing[0] || 0) + 1;
+  const obs = document.getElementById('fent-obs').value.trim();
+  const resp = document.getElementById('fent-personal').value;
+  const nuevasInstancias = [];
+  try {
+    for (let i = 0; i < qty; i++) {
+      const id = `${prefix}-${String(next + i).padStart(3, '0')}`;
+      const snap = await db.collection('insumos_instancias').doc(id).get();
+      if (snap.exists) { next++; i--; continue; }
+      const inst = { itemId, nombre: item.nombre, sede, estado: 'DISPONIBLE',
+        creadoEn: new Date().toISOString(), creadoPor: maUser.email,
+        ...(item.tipoCantidad === 'RANGO' && { nivel: 100 }) };
+      await db.collection('insumos_instancias').doc(id).set(inst);
+      instanciasData.push({ id, ...inst });
+      nuevasInstancias.push(id);
+    }
+    const movRef = await db.collection('insumos_movimientos').add({
+      tipo: 'ENTRADA', itemId, itemNombre: item.nombre, sede, cantidad: qty,
+      instancias: nuevasInstancias, responsable: resp, motivo: obs,
+      usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date()
+    });
+    movimientosData.unshift({ id: movRef.id, tipo: 'ENTRADA', itemId, itemNombre: item.nombre,
+      sede, cantidad: qty, instancias: nuevasInstancias, responsable: resp, motivo: obs,
+      usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date() });
+    toast(`✓ ${qty} instancia${qty > 1 ? 's' : ''} creada${qty > 1 ? 's' : ''}: ${nuevasInstancias.join(', ')}`, 'ok');
+    closeModal('modal-entrada');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── SALIDA / BAJA ─────────────────────────────────────────
+function openModalSalida(tipo = 'SALIDA', instId = null) {
+  currentSalidaTipo = tipo;
+  const esBaja = tipo === 'BAJA';
+  document.getElementById('modal-salida-title').textContent = esBaja ? '⚠️ Dar de baja' : '⬆ Registrar salida';
+  document.getElementById('modal-salida-sub').innerHTML = esBaja
+    ? '⚠️ <strong>Baja:</strong> El bien ya no sirve por daño, pérdida o robo. El motivo es obligatorio.'
+    : '📤 <strong>Salida:</strong> El bien fue consumido o entregado definitivamente.';
+  document.getElementById('fsal-motivo-label').textContent = esBaja ? 'Motivo * (obligatorio)' : 'Observación';
+  document.getElementById('btn-save-salida').textContent = esBaja ? '⚠️ Confirmar baja' : '⬆ Confirmar salida';
+  document.getElementById('fsal-buscar').value = instId || '';
+  document.getElementById('fsal-sede-filtro').innerHTML = '<option value="">Todas las sedes</option>' + sedes.map(s => `<option value="${s.sede}">${s.sede}</option>`).join('');
+  document.getElementById('fsal-motivo').value = '';
+  document.getElementById('fsal-inst-info').style.display = 'none';
+  const pOpts = personalData.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  document.getElementById('fsal-personal').innerHTML = `<option value="">—</option>${pOpts}`;
+  buscarInstanciasSalida();
+  if (instId) setTimeout(() => { document.getElementById('fsal-instancia').value = instId; onSalidaInstanciaChange(); }, 100);
+  document.getElementById('modal-salida').classList.add('open');
+}
+
+function buscarInstanciasSalida() {
+  const q = document.getElementById('fsal-buscar').value.toLowerCase();
+  const sede = document.getElementById('fsal-sede-filtro').value;
+  let list = instanciasData.filter(i => i.estado !== 'BAJA');
+  if (sede) list = list.filter(i => i.sede === sede);
+  if (q) list = list.filter(i => (i.id + i.nombre + (i.sede || '')).toLowerCase().includes(q));
+  const sel = document.getElementById('fsal-instancia');
+  sel.innerHTML = '<option value="">Seleccionar instancia...</option>' +
+    list.map(i => `<option value="${i.id}">${i.id} — ${i.nombre} (${i.sede || 'sin sede'})</option>`).join('');
+  document.getElementById('fsal-inst-info').style.display = 'none';
+}
+
+function onSalidaInstanciaChange() {
+  const instId = document.getElementById('fsal-instancia').value;
+  const inst = instanciasData.find(x => x.id === instId);
+  const info = document.getElementById('fsal-inst-info');
+  if (!inst) { info.style.display = 'none'; return; }
+  const item = catalogoData.find(x => x.id === inst.itemId);
+  const esRango = item && item.tipoCantidad === 'RANGO';
+  info.style.display = 'block';
+  info.innerHTML = `<strong>${inst.id}</strong> · ${inst.nombre}<br>
+    📍 Sede: <strong>${inst.sede || '—'}</strong> · Estado: <strong>${inst.estado || 'DISPONIBLE'}</strong>
+    ${esRango && inst.nivel !== undefined ? '<br>📊 Nivel: ' + inst.nivel + '%' : ''}`;
+}
+
+async function saveSalida() {
+  const instId = document.getElementById('fsal-instancia').value;
+  const motivo = document.getElementById('fsal-motivo').value.trim();
+  const resp = document.getElementById('fsal-personal').value;
+  const esBaja = currentSalidaTipo === 'BAJA';
+  if (!instId) { toast('Selecciona una instancia', 'err'); return; }
+  if (esBaja && !motivo) { toast('El motivo es obligatorio para dar de baja', 'err'); return; }
+  const inst = instanciasData.find(x => x.id === instId);
+  if (!inst) return;
+  try {
+    await db.collection('insumos_instancias').doc(instId).delete();
+    instanciasData = instanciasData.filter(x => x.id !== instId);
+    const movRef = await db.collection('insumos_movimientos').add({
+      tipo: currentSalidaTipo, itemId: inst.itemId, itemNombre: inst.nombre,
+      instanciaId: instId, sede: inst.sede, cantidad: 1, unidad: 'UND',
+      motivo, responsable: resp, usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date()
+    });
+    movimientosData.unshift({ id: movRef.id, tipo: currentSalidaTipo, itemId: inst.itemId,
+      itemNombre: inst.nombre, instanciaId: instId, sede: inst.sede, cantidad: 1,
+      motivo, responsable: resp, usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date() });
+    toast(`✓ ${esBaja ? 'Baja' : 'Salida'} registrada — ${instId}`, 'ok');
+    closeModal('modal-salida');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── TRANSFERENCIA ─────────────────────────────────────────
+function openModalTransferencia() {
+  document.getElementById('ft-sede-origen').innerHTML = '<option value="">Seleccionar sede origen...</option>' + sedes.map(s => `<option value="${s.sede}">${s.sede}</option>`).join('');
+  document.getElementById('ft-destino').innerHTML = sedeOpts(false);
+  document.getElementById('ft-instancia').innerHTML = '<option value="">Seleccionar...</option>';
+  document.getElementById('ft-inst-info').style.display = 'none';
+  document.getElementById('ft-buscar-inst').value = '';
+  document.getElementById('ft-obs').value = '';
+  const pOpts = personalData.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  document.getElementById('ft-tecnico').innerHTML = `<option value="">—</option>${pOpts}`;
+  document.getElementById('modal-transf').classList.add('open');
+}
+
+function onTransfOrigenChange() {
+  const sede = document.getElementById('ft-sede-origen').value;
+  let list = instanciasData.filter(i => i.estado !== 'BAJA');
+  if (sede) list = list.filter(i => i.sede === sede);
+  document.getElementById('ft-instancia').innerHTML = '<option value="">Seleccionar instancia...</option>' +
+    list.map(i => `<option value="${i.id}">${i.id} — ${i.nombre}</option>`).join('');
+  document.getElementById('ft-inst-info').style.display = 'none';
+}
+
+function buscarInstanciasTransf() {
+  const q = document.getElementById('ft-buscar-inst').value.toLowerCase();
+  if (!q) return;
+  document.getElementById('ft-sede-origen').value = '';
+  let list = instanciasData.filter(i => i.estado !== 'BAJA' && (i.id + i.nombre + (i.sede || '')).toLowerCase().includes(q));
+  document.getElementById('ft-instancia').innerHTML = '<option value="">Seleccionar instancia...</option>' +
+    list.map(i => `<option value="${i.id}">${i.id} — ${i.nombre} (${i.sede || 'sin sede'})</option>`).join('');
+  document.getElementById('ft-inst-info').style.display = 'none';
+}
+
+function onTransfInstanciaChange() {
+  const instId = document.getElementById('ft-instancia').value;
+  const inst = instanciasData.find(x => x.id === instId);
+  const info = document.getElementById('ft-inst-info');
+  if (!inst) { info.style.display = 'none'; return; }
+  info.style.display = 'block';
+  info.innerHTML = `<strong>${inst.id}</strong> · ${inst.nombre}<br>📍 Sede actual: <strong>${inst.sede || '—'}</strong>`;
+  const origenSel = document.getElementById('ft-sede-origen');
+  if (inst.sede) origenSel.value = inst.sede;
+  const destinoSel = document.getElementById('ft-destino');
+  destinoSel.innerHTML = sedeOpts(false);
+  if (inst.sede) Array.from(destinoSel.options).forEach(opt => { if (opt.value === inst.sede) opt.disabled = true; });
+}
+
+async function saveTransferencia() {
+  const instId = document.getElementById('ft-instancia').value;
+  const destino = document.getElementById('ft-destino').value;
+  const obs = document.getElementById('ft-obs').value.trim();
+  const tecnico = document.getElementById('ft-tecnico').value;
+  if (!instId || !destino) { toast('Selecciona instancia y sede destino', 'err'); return; }
+  const inst = instanciasData.find(x => x.id === instId);
+  if (!inst) return;
+  const origen = inst.sede;
+  if (origen === destino) { toast('La sede origen y destino son iguales', 'err'); return; }
+  try {
+    await db.collection('insumos_instancias').doc(instId).update({ sede: destino, updatedAt: new Date().toISOString() });
+    const idx = instanciasData.findIndex(x => x.id === instId);
+    if (idx >= 0) instanciasData[idx].sede = destino;
+    const movRef = await db.collection('insumos_movimientos').add({
+      tipo: 'TRANSFERENCIA', itemId: inst.itemId, itemNombre: inst.nombre,
+      instanciaId: instId, sedeOrigen: origen, sedeDestino: destino,
+      motivo: obs, responsable: tecnico, usuario: maUser.email,
+      estado: 'CONFIRMADO', fecha: new Date()
+    });
+    movimientosData.unshift({ id: movRef.id, tipo: 'TRANSFERENCIA', itemId: inst.itemId,
+      itemNombre: inst.nombre, instanciaId: instId, sedeOrigen: origen, sedeDestino: destino,
+      motivo: obs, responsable: tecnico, usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date() });
+    toast(`✓ ${instId} transferido a ${destino}`, 'ok');
+    closeModal('modal-transf');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── INSTANCIAS CRUD ───────────────────────────────────────
+let editingInstanciaId = null;
+
+function openModalNuevaInstancia() {
+  editingInstanciaId = null;
+  const sel = document.getElementById('fi-inst-tipo');
+  sel.innerHTML = '<option value="">Seleccionar...</option>' +
+    catalogoData.map(i => `<option value="${i.id}">${i.nombre}</option>`).join('');
+  document.getElementById('fi-inst-id').value = '';
+  document.getElementById('fi-inst-id-status').textContent = '';
+  document.getElementById('fi-inst-notas').value = '';
+  document.getElementById('fi-inst-nivel-wrap').style.display = 'none';
+  document.getElementById('fi-inst-sede').innerHTML = sedeOpts(false);
+  document.getElementById('modal-instancia').classList.add('open');
+}
+
+function onInstTipoChange() {
+  const itemId = document.getElementById('fi-inst-tipo').value;
+  const item = catalogoData.find(x => x.id === itemId);
+  document.getElementById('fi-inst-nivel-wrap').style.display = (item && item.tipoCantidad === 'RANGO') ? 'block' : 'none';
+  if (itemId) generarInstanciaId();
+}
+
+async function generarInstanciaId() {
+  const itemId = document.getElementById('fi-inst-tipo').value;
+  if (!itemId) { toast('Selecciona el tipo de bien primero', 'warn'); return; }
+  const item = catalogoData.find(x => x.id === itemId);
+  if (!item) return;
+  const prefix = (item.codigo || item.nombre.replace(/[^A-Z0-9]/gi, '')).substring(0, 3).toUpperCase();
+  const existing = instanciasData.filter(i => i.id.startsWith(prefix + '-')).map(i => parseInt(i.id.replace(prefix + '-', '')) || 0).sort((a, b) => b - a);
+  const nextNum = (existing[0] || 0) + 1;
+  const newId = `${prefix}-${String(nextNum).padStart(3, '0')}`;
+  document.getElementById('fi-inst-id').value = newId;
+  await verificarIdUnico(newId);
+}
+
+async function verificarIdUnico(id) {
+  const statusEl = document.getElementById('fi-inst-id-status');
+  if (!id) { statusEl.textContent = ''; return true; }
+  if (instanciasData.find(i => i.id === id)) {
+    statusEl.innerHTML = '<span style="color:var(--red)">⚠️ ID ya existe</span>'; return false;
+  }
+  try {
+    const snap = await db.collection('insumos_instancias').doc(id).get();
+    if (snap.exists) { statusEl.innerHTML = '<span style="color:var(--red)">⚠️ ID ya existe</span>'; return false; }
+    statusEl.innerHTML = '<span style="color:var(--green)">✓ ID disponible</span>'; return true;
+  } catch(e) { statusEl.textContent = ''; return true; }
+}
+
+async function saveInstancia() {
+  const itemId = document.getElementById('fi-inst-tipo').value;
+  const id = document.getElementById('fi-inst-id').value.trim().toUpperCase();
+  const sede = document.getElementById('fi-inst-sede').value;
+  if (!itemId || !id || !sede) { toast('Completa todos los campos obligatorios', 'err'); return; }
+  if (!catalogoData.find(x => x.id === itemId)) { toast('El tipo de bien no existe en el catálogo', 'err'); return; }
+  const esUnico = await verificarIdUnico(id);
+  if (!esUnico) { toast('El ID ya existe, usa otro', 'err'); return; }
+  const item = catalogoData.find(x => x.id === itemId);
+  const nivel = (item && item.tipoCantidad === 'RANGO') ? Number(document.getElementById('fi-inst-nivel').value) : null;
+  const instancia = { itemId, nombre: item ? item.nombre : '', sede, estado: 'DISPONIBLE',
+    notas: document.getElementById('fi-inst-notas').value.trim(),
+    creadoEn: new Date().toISOString(), creadoPor: maUser.email,
+    ...(nivel !== null && { nivel }) };
+  try {
+    await db.collection('insumos_instancias').doc(id).set(instancia);
+    instanciasData.push({ id, ...instancia });
+    toast('✓ Instancia creada — ' + id, 'ok');
+    closeModal('modal-instancia');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+function openEditInstancia(instId) {
+  const inst = instanciasData.find(x => x.id === instId);
+  if (!inst) return;
+  editingInstanciaId = instId;
+  const item = catalogoData.find(x => x.id === inst.itemId);
+  const esRango = item && item.tipoCantidad === 'RANGO';
+  document.getElementById('modal-inst-edit-title').textContent = '✏️ ' + inst.nombre;
+  document.getElementById('inst-edit-id-display').textContent = 'ID: ' + instId;
+  document.getElementById('fe-inst-sede').innerHTML = sedeOpts(false);
+  document.getElementById('fe-inst-sede').value = inst.sede || '';
+  document.getElementById('fe-inst-estado').value = inst.estado || 'DISPONIBLE';
+  document.getElementById('fe-inst-notas').value = inst.notas || '';
+  document.getElementById('fe-inst-nivel-wrap').style.display = esRango ? 'block' : 'none';
+  if (esRango && inst.nivel !== undefined) document.getElementById('fe-inst-nivel').value = inst.nivel;
+  document.getElementById('modal-inst-edit').classList.add('open');
+}
+
+async function updateInstancia() {
+  if (!editingInstanciaId) return;
+  const sede = document.getElementById('fe-inst-sede').value;
+  const estado = document.getElementById('fe-inst-estado').value;
+  const notas = document.getElementById('fe-inst-notas').value.trim();
+  const inst = instanciasData.find(x => x.id === editingInstanciaId);
+  const item = inst ? catalogoData.find(x => x.id === inst.itemId) : null;
+  const nivel = (item && item.tipoCantidad === 'RANGO') ? Number(document.getElementById('fe-inst-nivel').value) : undefined;
+  const updates = { sede, estado, notas, updatedAt: new Date().toISOString(), updatedBy: maUser.email };
+  if (nivel !== undefined) updates.nivel = nivel;
+  try {
+    await db.collection('insumos_instancias').doc(editingInstanciaId).update(updates);
+    const idx = instanciasData.findIndex(x => x.id === editingInstanciaId);
+    if (idx >= 0) Object.assign(instanciasData[idx], updates);
+    toast('✓ Instancia actualizada', 'ok');
+    closeModal('modal-inst-edit');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function deleteInstancia() {
+  if (!editingInstanciaId) return;
+  if (!confirm('¿Eliminar esta instancia?')) return;
+  try {
+    await db.collection('insumos_instancias').doc(editingInstanciaId).delete();
+    instanciasData = instanciasData.filter(x => x.id !== editingInstanciaId);
+    toast('Instancia eliminada', 'ok');
+    closeModal('modal-inst-edit');
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+// ── QR SELECCIÓN MÚLTIPLE Y ZIP ───────────────────────────
+let selectedQRIds = new Set();
+
+function toggleAllQR(checked) {
+  document.querySelectorAll('.qr-chk').forEach(chk => {
+    chk.checked = checked;
+    if (checked) selectedQRIds.add(chk.dataset.id);
+    else selectedQRIds.delete(chk.dataset.id);
+  });
+  updateQRSelectionBar();
+}
+
+function updateQRSelection() {
+  selectedQRIds.clear();
+  document.querySelectorAll('.qr-chk:checked').forEach(chk => selectedQRIds.add(chk.dataset.id));
+  updateQRSelectionBar();
+}
+
+function updateQRSelectionBar() {
+  const bar = document.getElementById('qr-selection-bar');
+  const count = document.getElementById('qr-selected-count');
+  if (selectedQRIds.size > 0) {
+    bar.style.display = 'flex';
+    count.textContent = selectedQRIds.size + ' seleccionado' + (selectedQRIds.size > 1 ? 's' : '');
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+function clearQRSelection() {
+  selectedQRIds.clear();
+  document.querySelectorAll('.qr-chk').forEach(c => c.checked = false);
+  const chkAll = document.getElementById('chk-all');
+  if (chkAll) chkAll.checked = false;
+  updateQRSelectionBar();
+}
+
+async function generateQRCanvas(itemId) {
+  const item = catalogoData.find(x => x.id === itemId);
+  if (!item) return null;
+  const canvas = document.createElement('canvas');
+  canvas.width = 319; canvas.height = 240;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#ffffff';
+  ctx.fillRect(0, 0, 319, 240);
+  const qrDiv = document.createElement('div');
+  document.body.appendChild(qrDiv);
+  await new Promise(resolve => {
+    new QRCode(qrDiv, { text: itemId, width: 180, height: 180, correctLevel: QRCode.CorrectLevel.H, colorDark: '#000000', colorLight: '#ffffff' });
+    setTimeout(resolve, 300);
+  });
+  const qrEl = qrDiv.querySelector('canvas') || qrDiv.querySelector('img');
+  if (qrEl) ctx.drawImage(qrEl, 70, 8, 180, 180);
+  document.body.removeChild(qrDiv);
+  ctx.fillStyle = '#000000';
+  ctx.font = 'bold 14px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(item.codigo || itemId, 159, 203);
+  ctx.font = 'bold 16px sans-serif';
+  const nombre = item.nombre.toUpperCase();
+  const maxW = 300;
+  let fontSize = 16;
+  while (ctx.measureText(nombre).width > maxW && fontSize > 9) { fontSize--; ctx.font = `bold ${fontSize}px sans-serif`; }
+  ctx.fillText(nombre, 159, 225);
+  return canvas;
+}
+
+async function exportSelectedQRZip() {
+  if (selectedQRIds.size === 0) { toast('Selecciona al menos un ítem', 'warn'); return; }
+  toast('Generando etiquetas...', '');
+  const zip = new JSZip();
+  for (const id of selectedQRIds) {
+    const item = catalogoData.find(x => x.id === id);
+    if (!item) continue;
+    const canvas = await generateQRCanvas(id);
+    if (!canvas) continue;
+    const blob = await new Promise(r => canvas.toBlob(r, 'image/png', 1.0));
+    zip.file(`${(item.codigo || id).replace(/[^a-zA-Z0-9]/g, '_')}_${item.nombre.replace(/[^a-zA-Z0-9]/g, '_')}.png`, blob);
+  }
+  const zipBlob = await zip.generateAsync({ type: 'blob' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(zipBlob);
+  link.download = `etiquetas_multiaire_${new Date().toISOString().slice(0, 10)}.zip`;
+  link.click();
+  toast('✓ ZIP descargado con ' + selectedQRIds.size + ' etiquetas', 'ok');
+}
+
+// Cerrar modales al hacer clic fuera
+document.querySelectorAll('.modal-overlay').forEach(o => {
+  o.addEventListener('click', e => { if (e.target === o) { o.style.display='none'; o.classList.remove('open'); }});
+});
 </script>
 </body>
 </html>

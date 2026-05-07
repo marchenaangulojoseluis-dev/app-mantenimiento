@@ -518,17 +518,17 @@ tbody td{padding:9px 12px;vertical-align:middle}
     <div class="modal-sub" style="margin-bottom:14px">🔄 Traslada un bien entre sedes y/o cambia su responsable. El bien mantiene su ID y QR.</div>
     <div class="form-grid">
       <div class="form-group full">
-        <div class="form-label">Buscar por sede origen o ID</div>
+        <div class="form-label">Filtrar por sede o buscar por ID</div>
         <div style="display:flex;gap:8px">
-          <select class="form-select" id="ft-sede-origen" onchange="onTransfOrigenChange()"><option value="">Seleccionar sede origen...</option></select>
-          <input type="text" class="form-input" id="ft-buscar-inst" placeholder="O buscar por ID..." oninput="buscarInstanciasTransf()" style="max-width:160px">
+          <select class="form-select" id="ft-sede-origen" onchange="onTransfOrigenChange()"><option value="">Todas las sedes</option></select>
+          <input type="text" class="form-input" id="ft-buscar-inst" placeholder="Buscar por ID..." oninput="buscarInstanciasTransf()" style="max-width:160px">
         </div>
       </div>
+      <div id="ft-inst-info" style="display:none;grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:10px;font-size:11px"></div>
       <div class="form-group full">
         <div class="form-label">Instancia a transferir *</div>
         <select class="form-select" id="ft-instancia" onchange="onTransfInstanciaChange()"><option value="">Seleccionar...</option></select>
       </div>
-      <div id="ft-inst-info" style="display:none;grid-column:1/-1;background:var(--surface2);border-radius:8px;padding:10px;font-size:11px"></div>
       <!-- Checkboxes qué transferir -->
       <div class="form-group full">
         <div class="form-label">¿Qué deseas transferir? *</div>
@@ -1875,9 +1875,10 @@ async function saveSalida() {
 
 // ── TRANSFERENCIA ─────────────────────────────────────────
 function openModalTransferencia() {
-  document.getElementById('ft-sede-origen').innerHTML = '<option value="">Seleccionar sede origen...</option>' + sedes.map(s => `<option value="${s.sede}">${s.sede}</option>`).join('');
-  document.getElementById('ft-destino').innerHTML = sedeOpts(false);
-  document.getElementById('ft-instancia').innerHTML = '<option value="">Seleccionar...</option>';
+  document.getElementById('ft-sede-origen').innerHTML = '<option value="">Todas las sedes</option>' + sedes.map(s => `<option value="${s.sede}">${s.sede}</option>`).join('');
+  const allInsts = instanciasData.filter(i => i.estado !== 'BAJA');
+  document.getElementById('ft-instancia').innerHTML = '<option value="">Seleccionar...</option>' +
+    allInsts.map(i => `<option value="${i.id}">${i.id} — ${i.nombre} (${i.sede || 'sin sede'})</option>`).join('');
   document.getElementById('ft-inst-info').style.display = 'none';
   document.getElementById('ft-buscar-inst').value = '';
   document.getElementById('ft-obs').value = '';
@@ -1886,6 +1887,7 @@ function openModalTransferencia() {
   const pOpts = personalData.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
   document.getElementById('ft-tecnico').innerHTML = `<option value="">—</option>${pOpts}`;
   document.getElementById('ft-resp-destino').innerHTML = `<option value="">—</option>${pOpts}`;
+  document.getElementById('ft-destino').innerHTML = sedeOpts(false);
   onTransfTipoChange();
   document.getElementById('modal-transf').classList.add('open');
 }
@@ -1942,6 +1944,7 @@ function onTransfInstanciaChange() {
   info.innerHTML = `<strong>${inst.id}</strong> · ${inst.nombre}<br>
     📍 Sede actual: <strong>${inst.sede || '—'}</strong>
     ${inst.responsable ? ` · 👤 Responsable: <strong>${inst.responsable}</strong>` : ''}`;
+  // Actualizar sede origen SIN disparar onchange (evita loop que resetea el select)
   const origenSel = document.getElementById('ft-sede-origen');
   if (inst.sede) origenSel.value = inst.sede;
   const destinoSel = document.getElementById('ft-destino');

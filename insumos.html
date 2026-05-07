@@ -665,6 +665,31 @@ tbody td{padding:9px 12px;vertical-align:middle}
   </div>
 </div>
 
+<!-- MODAL EDITAR MOVIMIENTO -->
+<div class="modal-overlay" id="modal-edit-mov" onclick="if(event.target===this)closeModal('modal-edit-mov')">
+  <div class="modal" style="max-width:420px">
+    <div class="modal-header">
+      <div class="modal-title">✏️ Editar movimiento</div>
+      <div onclick="closeModal('modal-edit-mov')" style="min-width:44px;min-height:44px;border-radius:8px;border:1.5px solid var(--border);background:var(--red-bg);color:var(--red);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);background:var(--surface2);padding:8px 12px;border-radius:6px" id="em-info"></div>
+      <div class="form-group full">
+        <div class="form-label">Responsable</div>
+        <select class="form-select" id="em-responsable"></select>
+      </div>
+      <div class="form-group full">
+        <div class="form-label">Observación</div>
+        <textarea class="form-textarea" id="em-motivo" placeholder="Opcional..."></textarea>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" onclick="closeModal('modal-edit-mov')">Cancelar</button>
+      <button class="btn btn-primary" onclick="guardarEdicionMovimiento()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script src="firebase-config.js"></script>
@@ -1159,7 +1184,9 @@ function renderMovimientos(){
     // Detalle de cambios para ACTUALIZACION
     const cambiosInfo = m.tipo==='ACTUALIZACION' && m.cambios ? `<span style="font-size:10px;color:var(--muted2)"> · ${m.cambios}</span>` : '';
     const badge=m.estado==='PENDIENTE'?`<span class="tipo-badge tipo-pendiente">⏳ pendiente</span>`:m.estado==='RECHAZADO'?`<span class="tipo-badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)">✗ rechazado</span>`:'';
-    const delBtn=can('eliminarMov')&&!isPend?`<button class="btn btn-sm btn-red" onclick="deleteMovimiento('${m.id}')">🗑</button>`:'';
+    const canMod=can('eliminarMov')&&!isPend;
+    const delBtn=canMod?`<button class="btn btn-sm btn-red" title="Revertir acción" onclick="revertirMovimiento('${m.id}')">↩ Revertir</button>`:'';
+    const editBtn=canMod&&can('editarMov')?`<button class="btn btn-sm" title="Editar" onclick="editarMovimiento('${m.id}')">✏️</button>`:'';
     return `<div class="mov-item ${isPend?'pendiente':''}">
       <div class="mov-icon ${tCls}">${icons[m.tipo]||'📦'}</div>
       <div class="mov-body">
@@ -1167,7 +1194,7 @@ function renderMovimientos(){
         <div class="mov-meta">${fs} · ${m.responsable||m.usuario||'—'}${sedeStr?' · '+sedeStr:''}${m.motivo?' · '+m.motivo:''}${instInfo}${cambiosInfo}</div>
       </div>
       <div class="mov-qty ${tCls}">${cantInfo} ${m.unidad||'UND'}</div>
-      ${delBtn?`<div class="mov-actions">${delBtn}</div>`:''}
+      ${(delBtn||editBtn)?`<div class="mov-actions">${editBtn}${delBtn}</div>`:''}
     </div>`;
   }).join('')+'</div>';
 }
@@ -2072,20 +2099,26 @@ async function updateInstancia() {
   if (nivel !== undefined) updates.nivel = nivel;
   // Detectar qué cambió para el historial
   const diffs = [];
-  if (inst.estado !== estado) diffs.push(`Estado: ${inst.estado||'DISPONIBLE'} → ${estado}`);
-  if (inst.sede !== sede) diffs.push(`Sede: ${inst.sede||'—'} → ${sede}`);
-  if (nivel !== undefined && inst.nivel !== nivel) diffs.push(`Nivel: ${inst.nivel??'—'}% → ${nivel}%`);
+  if (inst.estado !== estado) diffs.push({campo:'estado', de:inst.estado||'DISPONIBLE', a:estado});
+  if (inst.sede !== sede) diffs.push({campo:'sede', de:inst.sede||'', a:sede});
+  if (nivel !== undefined && inst.nivel !== nivel) diffs.push({campo:'nivel', de:inst.nivel??0, a:nivel});
   try {
     await db.collection('insumos_instancias').doc(editingInstanciaId).update(updates);
     const idx = instanciasData.findIndex(x => x.id === editingInstanciaId);
     if (idx >= 0) Object.assign(instanciasData[idx], updates);
     // Registrar movimiento solo si hubo cambios relevantes
     if (diffs.length > 0) {
+      const cambiosLabel = diffs.map(d => {
+        if(d.campo==='nivel') return `Nivel: ${d.de}% → ${d.a}%`;
+        if(d.campo==='estado') return `Estado: ${d.de} → ${d.a}`;
+        if(d.campo==='sede') return `Sede: ${d.de} → ${d.a}`;
+        return `${d.campo}: ${d.de} → ${d.a}`;
+      }).join(' | ');
       const mov = {
         tipo: 'ACTUALIZACION', itemId: inst.itemId, itemNombre: inst.nombre,
         instanciaId: editingInstanciaId, sede: inst.sede,
-        cambios: diffs.join(' | '), usuario: maUser.email,
-        estado: 'CONFIRMADO', fecha: new Date()
+        cambios: cambiosLabel, diffsData: diffs,
+        usuario: maUser.email, estado: 'CONFIRMADO', fecha: new Date()
       };
       const movRef = await db.collection('insumos_movimientos').add(mov);
       movimientosData.unshift({ id: movRef.id, ...mov });
@@ -2198,6 +2231,95 @@ async function exportSelectedQRZip() {
   link.download = `etiquetas_multiaire_${new Date().toISOString().slice(0, 10)}.zip`;
   link.click();
   toast('✓ ZIP descargado con ' + selectedQRIds.size + ' etiquetas', 'ok');
+}
+
+
+// ── REVERTIR MOVIMIENTO ───────────────────────────────────
+let editingMovId = null;
+
+async function revertirMovimiento(movId) {
+  const mov = movimientosData.find(x => x.id === movId);
+  if (!mov) return;
+  const tipoLabel = {ENTRADA:'entrada',SALIDA:'salida',BAJA:'baja',TRANSFERENCIA:'transferencia',ACTUALIZACION:'actualización'}[mov.tipo] || mov.tipo;
+  if (!confirm(`¿Revertir esta ${tipoLabel}?\nEsta acción deshará el efecto en el inventario.`)) return;
+  try {
+    if (mov.tipo === 'ENTRADA') {
+      // Eliminar las instancias creadas
+      const ids = mov.instancias || (mov.instanciaId ? [mov.instanciaId] : []);
+      for (const id of ids) {
+        await db.collection('insumos_instancias').doc(id).delete();
+        instanciasData = instanciasData.filter(x => x.id !== id);
+      }
+      toast(`✓ Entrada revertida — ${ids.length} instancia(s) eliminada(s)`, 'ok');
+    } else if (mov.tipo === 'SALIDA' || mov.tipo === 'BAJA') {
+      // Recrear la instancia con estado DISPONIBLE
+      const instId = mov.instanciaId;
+      if (!instId) { toast('No se puede revertir: sin ID de instancia', 'err'); return; }
+      const item = catalogoData.find(x => x.id === mov.itemId);
+      const inst = {
+        itemId: mov.itemId, nombre: mov.itemNombre || (item ? item.nombre : ''),
+        sede: mov.sede || '', estado: 'DISPONIBLE',
+        creadoEn: new Date().toISOString(), creadoPor: maUser.email,
+        notas: 'Revertido desde movimiento ' + movId
+      };
+      await db.collection('insumos_instancias').doc(instId).set(inst);
+      instanciasData.push({ id: instId, ...inst });
+      toast(`✓ ${mov.tipo === 'BAJA' ? 'Baja' : 'Salida'} revertida — ${instId} restaurado`, 'ok');
+    } else if (mov.tipo === 'TRANSFERENCIA') {
+      // Devolver instancia a sede origen
+      const instId = mov.instanciaId;
+      if (!instId || !mov.sedeOrigen) { toast('No se puede revertir: faltan datos', 'err'); return; }
+      await db.collection('insumos_instancias').doc(instId).update({ sede: mov.sedeOrigen, updatedAt: new Date().toISOString() });
+      const idx = instanciasData.findIndex(x => x.id === instId);
+      if (idx >= 0) instanciasData[idx].sede = mov.sedeOrigen;
+      toast(`✓ Transferencia revertida — ${instId} devuelto a ${mov.sedeOrigen}`, 'ok');
+    } else if (mov.tipo === 'ACTUALIZACION') {
+      // Revertir cada campo al valor anterior usando diffsData
+      const instId = mov.instanciaId;
+      if (!instId) { toast('No se puede revertir: sin ID de instancia', 'err'); return; }
+      const diffs = mov.diffsData || [];
+      if (!diffs.length) { toast('No hay datos suficientes para revertir', 'warn'); return; }
+      const revertUpdates = { updatedAt: new Date().toISOString(), updatedBy: maUser.email };
+      diffs.forEach(d => { revertUpdates[d.campo] = d.de; });
+      await db.collection('insumos_instancias').doc(instId).update(revertUpdates);
+      const idx = instanciasData.findIndex(x => x.id === instId);
+      if (idx >= 0) Object.assign(instanciasData[idx], revertUpdates);
+      toast(`✓ Actualización revertida — ${instId}`, 'ok');
+    }
+    // Eliminar el movimiento del historial
+    await db.collection('insumos_movimientos').doc(movId).delete();
+    movimientosData = movimientosData.filter(x => x.id !== movId);
+    renderAll();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
+}
+
+async function editarMovimiento(movId) {
+  const mov = movimientosData.find(x => x.id === movId);
+  if (!mov) return;
+  editingMovId = movId;
+  const f = mov.fecha ? (mov.fecha.toDate ? mov.fecha.toDate() : new Date(mov.fecha)) : new Date();
+  const fs = f.toLocaleDateString('es-PE', {day:'2-digit', month:'short', year:'numeric'});
+  document.getElementById('em-info').textContent = `${mov.tipo} · ${mov.itemNombre || '—'} · ${fs}`;
+  const pOpts = personalData.map(p => `<option value="${p.nombre}">${p.nombre}</option>`).join('');
+  const respSel = document.getElementById('em-responsable');
+  respSel.innerHTML = `<option value="">—</option>${pOpts}`;
+  respSel.value = mov.responsable || '';
+  document.getElementById('em-motivo').value = mov.motivo || '';
+  document.getElementById('modal-edit-mov').classList.add('open');
+}
+
+async function guardarEdicionMovimiento() {
+  if (!editingMovId) return;
+  const responsable = document.getElementById('em-responsable').value;
+  const motivo = document.getElementById('em-motivo').value.trim();
+  try {
+    await db.collection('insumos_movimientos').doc(editingMovId).update({ responsable, motivo });
+    const idx = movimientosData.findIndex(x => x.id === editingMovId);
+    if (idx >= 0) { movimientosData[idx].responsable = responsable; movimientosData[idx].motivo = motivo; }
+    toast('✓ Movimiento actualizado', 'ok');
+    closeModal('modal-edit-mov');
+    renderMovimientos();
+  } catch(e) { toast('Error: ' + e.message, 'err'); }
 }
 
 // Cerrar modales al hacer clic fuera

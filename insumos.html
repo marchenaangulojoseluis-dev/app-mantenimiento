@@ -674,6 +674,33 @@ tbody td{padding:9px 12px;vertical-align:middle}
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">
       <div style="font-family:var(--mono);font-size:11px;color:var(--muted2);background:var(--surface2);padding:8px 12px;border-radius:6px" id="em-info"></div>
+      <!-- Campos extra para ACTUALIZACION -->
+      <div id="em-actualizacion-fields" style="display:none;flex-direction:column;gap:12px">
+        <div id="em-estado-wrap" style="display:none" class="form-group full">
+          <div class="form-label">Estado</div>
+          <select class="form-select" id="em-estado">
+            <option value="DISPONIBLE">✅ Disponible</option>
+            <option value="EN_USO">🔧 En uso</option>
+            <option value="MANTENIMIENTO">⚠️ Mantenimiento</option>
+            <option value="DETERIORADO">🔴 Deteriorado</option>
+          </select>
+        </div>
+        <div id="em-nivel-wrap" style="display:none" class="form-group full">
+          <div class="form-label">Nivel</div>
+          <select class="form-select" id="em-nivel">
+            <option value="100">🟢 LLENO (100%)</option>
+            <option value="75">🟢 CASI LLENO (75%)</option>
+            <option value="50">🟡 MEDIO (50%)</option>
+            <option value="25">🟠 BAJO (25%)</option>
+            <option value="5">🔴 CASI VACÍO (5%)</option>
+            <option value="0">⚫ VACÍO (0%)</option>
+          </select>
+        </div>
+        <div id="em-sede-wrap" style="display:none" class="form-group full">
+          <div class="form-label">Sede</div>
+          <select class="form-select" id="em-sede"></select>
+        </div>
+      </div>
       <div class="form-group full">
         <div class="form-label">Responsable</div>
         <select class="form-select" id="em-responsable"></select>
@@ -2305,20 +2332,98 @@ async function editarMovimiento(movId) {
   respSel.innerHTML = `<option value="">—</option>${pOpts}`;
   respSel.value = mov.responsable || '';
   document.getElementById('em-motivo').value = mov.motivo || '';
+
+  // Campos extra solo para ACTUALIZACION
+  const extraWrap = document.getElementById('em-actualizacion-fields');
+  const estadoWrap = document.getElementById('em-estado-wrap');
+  const nivelWrap = document.getElementById('em-nivel-wrap');
+  const sedeWrap = document.getElementById('em-sede-wrap');
+  estadoWrap.style.display = 'none';
+  nivelWrap.style.display = 'none';
+  sedeWrap.style.display = 'none';
+
+  if (mov.tipo === 'ACTUALIZACION' && mov.diffsData && mov.diffsData.length) {
+    extraWrap.style.display = 'flex';
+    mov.diffsData.forEach(d => {
+      if (d.campo === 'estado') {
+        estadoWrap.style.display = 'block';
+        document.getElementById('em-estado').value = d.a;
+      }
+      if (d.campo === 'nivel') {
+        nivelWrap.style.display = 'block';
+        // Seleccionar el valor más cercano disponible
+        const opts = [100,75,50,25,5,0];
+        const closest = opts.reduce((a,b) => Math.abs(b-d.a)<Math.abs(a-d.a)?b:a);
+        document.getElementById('em-nivel').value = closest;
+      }
+      if (d.campo === 'sede') {
+        sedeWrap.style.display = 'block';
+        document.getElementById('em-sede').innerHTML = sedeOpts(false);
+        document.getElementById('em-sede').value = d.a;
+      }
+    });
+  } else {
+    extraWrap.style.display = 'none';
+  }
+
   document.getElementById('modal-edit-mov').classList.add('open');
 }
 
 async function guardarEdicionMovimiento() {
   if (!editingMovId) return;
+  const mov = movimientosData.find(x => x.id === editingMovId);
+  if (!mov) return;
   const responsable = document.getElementById('em-responsable').value;
   const motivo = document.getElementById('em-motivo').value.trim();
   try {
-    await db.collection('insumos_movimientos').doc(editingMovId).update({ responsable, motivo });
+    const movUpdates = { responsable, motivo };
+
+    // Si es ACTUALIZACION, aplicar cambios editados a la instancia
+    if (mov.tipo === 'ACTUALIZACION' && mov.diffsData && mov.diffsData.length) {
+      const instId = mov.instanciaId;
+      const instUpdates = { updatedAt: new Date().toISOString(), updatedBy: maUser.email };
+      const newDiffs = [];
+
+      mov.diffsData.forEach(d => {
+        if (d.campo === 'estado') {
+          const newVal = document.getElementById('em-estado').value;
+          instUpdates.estado = newVal;
+          newDiffs.push({ campo:'estado', de: d.de, a: newVal });
+        }
+        if (d.campo === 'nivel') {
+          const newVal = Number(document.getElementById('em-nivel').value);
+          instUpdates.nivel = newVal;
+          newDiffs.push({ campo:'nivel', de: d.de, a: newVal });
+        }
+        if (d.campo === 'sede') {
+          const newVal = document.getElementById('em-sede').value;
+          instUpdates.sede = newVal;
+          newDiffs.push({ campo:'sede', de: d.de, a: newVal });
+        }
+      });
+
+      // Actualizar instancia en Firestore
+      await db.collection('insumos_instancias').doc(instId).update(instUpdates);
+      const instIdx = instanciasData.findIndex(x => x.id === instId);
+      if (instIdx >= 0) Object.assign(instanciasData[instIdx], instUpdates);
+
+      // Actualizar label legible y diffsData en el movimiento
+      const cambiosLabel = newDiffs.map(d => {
+        if(d.campo==='nivel') return `Nivel: ${d.de}% → ${d.a}%`;
+        if(d.campo==='estado') return `Estado: ${d.de} → ${d.a}`;
+        if(d.campo==='sede') return `Sede: ${d.de} → ${d.a}`;
+        return `${d.campo}: ${d.de} → ${d.a}`;
+      }).join(' | ');
+      movUpdates.cambios = cambiosLabel;
+      movUpdates.diffsData = newDiffs;
+    }
+
+    await db.collection('insumos_movimientos').doc(editingMovId).update(movUpdates);
     const idx = movimientosData.findIndex(x => x.id === editingMovId);
-    if (idx >= 0) { movimientosData[idx].responsable = responsable; movimientosData[idx].motivo = motivo; }
+    if (idx >= 0) Object.assign(movimientosData[idx], movUpdates);
     toast('✓ Movimiento actualizado', 'ok');
     closeModal('modal-edit-mov');
-    renderMovimientos();
+    renderAll();
   } catch(e) { toast('Error: ' + e.message, 'err'); }
 }
 

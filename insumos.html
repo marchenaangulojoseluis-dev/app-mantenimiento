@@ -207,17 +207,19 @@ tbody td{padding:9px 12px;vertical-align:middle}
 .mov-icon.salida{background:var(--red-bg);border:1px solid var(--red-border)}
 .mov-icon.transferencia{background:#e8f4ff;border:1px solid #b0ccf0}
 .mov-icon.pendiente{background:var(--yellow-bg);border:1px solid var(--yellow-border)}
+.mov-icon.actualizacion{background:var(--purple-bg);border:1px solid var(--purple-border)}
 .mov-body{flex:1;min-width:0}
 .mov-title{font-weight:600;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mov-meta{color:var(--muted2);font-size:10px;font-family:var(--mono)}
 .mov-qty{font-family:var(--mono);font-weight:700;font-size:13px;text-align:right;flex-shrink:0}
-.mov-qty.entrada{color:var(--green)}.mov-qty.salida{color:var(--red)}.mov-qty.transferencia{color:#1B3F8B}.mov-qty.pendiente{color:var(--yellow)}
+.mov-qty.entrada{color:var(--green)}.mov-qty.salida{color:var(--red)}.mov-qty.transferencia{color:#1B3F8B}.mov-qty.pendiente{color:var(--yellow)}.mov-qty.actualizacion{color:var(--purple)}
 .mov-actions{display:flex;gap:5px;flex-shrink:0}
 .tipo-badge{display:inline-block;font-size:9px;padding:1px 6px;border-radius:8px;font-weight:700;text-transform:uppercase}
 .tipo-entrada{background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)}
 .tipo-salida{background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)}
 .tipo-transferencia{background:#e8f4ff;color:#1B3F8B;border:1px solid #b0ccf0}
 .tipo-pendiente{background:var(--yellow-bg);color:var(--yellow);border:1px solid var(--yellow-border)}
+.tipo-actualizacion{background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border)}
 .paq-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
 .paq-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
 .paq-name{font-weight:700;font-size:13px;margin-bottom:4px}
@@ -383,6 +385,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
           <option value="ENTRADA">⬇ Entradas</option>
           <option value="SALIDA">⬆ Salidas</option>
           <option value="TRANSFERENCIA">🔄 Transferencias</option>
+          <option value="ACTUALIZACION">✏️ Actualizaciones</option>
         </select>
         <select id="f-mov-sede" onchange="renderMovimientos()" style="width:180px"><option value="">Todas las sedes</option></select>
         <input type="search" id="q-mov" placeholder="Buscar ítem..." oninput="renderMovimientos()" style="width:180px;font-size:12px">
@@ -392,6 +395,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
         <div class="tip-item"><span class="tipo-badge tipo-salida">⬆ Salida</span> Consumo — el ítem se usa y se descuenta</div>
         <div class="tip-item"><span class="tipo-badge tipo-transferencia">🔄 Transfer.</span> Traslado entre sedes — el total no cambia</div>
         <div class="tip-item"><span class="tipo-badge tipo-pendiente">⏳ Pendiente</span> Solicitud de técnico esperando aprobación</div>
+        <div class="tip-item"><span class="tipo-badge" style="background:var(--purple-bg);color:var(--purple);border:1px solid var(--purple-border)">✏️ Actualización</span> Cambio de estado o nivel de una instancia</div>
       </div>
       <div id="movimientos-list"><div class="empty"><div class="empty-icon">⏳</div>Cargando...</div></div>
     </div>
@@ -1139,7 +1143,7 @@ function renderMovimientos(){
   });
   const c=document.getElementById('movimientos-list');
   if(!list.length){c.innerHTML='<div class="empty"><div class="empty-icon">📋</div>Sin movimientos</div>';return;}
-  const icons={ENTRADA:'⬇️',SALIDA:'⬆️',BAJA:'⚠️',TRANSFERENCIA:'🔄',SOLICITUD_SALIDA:'⏳',SOLICITUD_TRANSF:'⏳'};
+  const icons={ENTRADA:'⬇️',SALIDA:'⬆️',BAJA:'⚠️',TRANSFERENCIA:'🔄',SOLICITUD_SALIDA:'⏳',SOLICITUD_TRANSF:'⏳',ACTUALIZACION:'✏️'};
   c.innerHTML='<div class="mov-list">'+list.map(m=>{
     const f=m.fecha?(m.fecha.toDate?m.fecha.toDate():new Date(m.fecha)):new Date();
     const fs=f.toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
@@ -1151,14 +1155,16 @@ function renderMovimientos(){
     // Info de instancias
     const instInfo = m.instanciaId ? `<span style="font-family:var(--mono);font-size:10px;color:var(--muted2)"> · ${m.instanciaId}</span>` :
       m.instancias?.length ? `<span style="font-size:10px;color:var(--muted2)"> · ${m.instancias.length} uds: ${m.instancias.join(', ')}</span>` : '';
-    const cantInfo = m.cantidad ? `${sg}${m.cantidad}` : (m.instanciaId ? sg+'1' : '');
+    const cantInfo = m.tipo==='ACTUALIZACION' ? '' : (m.cantidad ? `${sg}${m.cantidad}` : (m.instanciaId ? sg+'1' : ''));
+    // Detalle de cambios para ACTUALIZACION
+    const cambiosInfo = m.tipo==='ACTUALIZACION' && m.cambios ? `<span style="font-size:10px;color:var(--muted2)"> · ${m.cambios}</span>` : '';
     const badge=m.estado==='PENDIENTE'?`<span class="tipo-badge tipo-pendiente">⏳ pendiente</span>`:m.estado==='RECHAZADO'?`<span class="tipo-badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)">✗ rechazado</span>`:'';
     const delBtn=can('eliminarMov')&&!isPend?`<button class="btn btn-sm btn-red" onclick="deleteMovimiento('${m.id}')">🗑</button>`:'';
     return `<div class="mov-item ${isPend?'pendiente':''}">
       <div class="mov-icon ${tCls}">${icons[m.tipo]||'📦'}</div>
       <div class="mov-body">
         <div class="mov-title">${m.itemNombre||'—'} <span class="tipo-badge tipo-${tCls.replace('solicitud_','')}">${(m.tipo||'').replace('SOLICITUD_','')}</span> ${badge}</div>
-        <div class="mov-meta">${fs} · ${m.responsable||m.usuario||'—'}${sedeStr?' · '+sedeStr:''}${m.motivo?' · '+m.motivo:''}${instInfo}</div>
+        <div class="mov-meta">${fs} · ${m.responsable||m.usuario||'—'}${sedeStr?' · '+sedeStr:''}${m.motivo?' · '+m.motivo:''}${instInfo}${cambiosInfo}</div>
       </div>
       <div class="mov-qty ${tCls}">${cantInfo} ${m.unidad||'UND'}</div>
       ${delBtn?`<div class="mov-actions">${delBtn}</div>`:''}
@@ -2064,10 +2070,26 @@ async function updateInstancia() {
   const nivel = (item && item.tipoCantidad === 'RANGO') ? Number(document.getElementById('fe-inst-nivel').value) : undefined;
   const updates = { sede, estado, notas, updatedAt: new Date().toISOString(), updatedBy: maUser.email };
   if (nivel !== undefined) updates.nivel = nivel;
+  // Detectar qué cambió para el historial
+  const diffs = [];
+  if (inst.estado !== estado) diffs.push(`Estado: ${inst.estado||'DISPONIBLE'} → ${estado}`);
+  if (inst.sede !== sede) diffs.push(`Sede: ${inst.sede||'—'} → ${sede}`);
+  if (nivel !== undefined && inst.nivel !== nivel) diffs.push(`Nivel: ${inst.nivel??'—'}% → ${nivel}%`);
   try {
     await db.collection('insumos_instancias').doc(editingInstanciaId).update(updates);
     const idx = instanciasData.findIndex(x => x.id === editingInstanciaId);
     if (idx >= 0) Object.assign(instanciasData[idx], updates);
+    // Registrar movimiento solo si hubo cambios relevantes
+    if (diffs.length > 0) {
+      const mov = {
+        tipo: 'ACTUALIZACION', itemId: inst.itemId, itemNombre: inst.nombre,
+        instanciaId: editingInstanciaId, sede: inst.sede,
+        cambios: diffs.join(' | '), usuario: maUser.email,
+        estado: 'CONFIRMADO', fecha: new Date()
+      };
+      const movRef = await db.collection('insumos_movimientos').add(mov);
+      movimientosData.unshift({ id: movRef.id, ...mov });
+    }
     toast('✓ Instancia actualizada', 'ok');
     closeModal('modal-inst-edit');
     renderAll();

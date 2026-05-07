@@ -1910,11 +1910,11 @@ function onTransfTipoChange() {
   const leyenda = document.getElementById('ft-transf-leyenda');
   let msg = '';
   if (sede && resp) {
-    msg = '📦 + 👤 Se cambiará la <strong>sede</strong> del bien y se asignará un <strong>nuevo responsable</strong>. Ambos cambios quedarán registrados y podrán revertirse individualmente.';
+    msg = '📦 + 👤 Se cambiará la <strong>sede</strong> del bien y se asignará un <strong>nuevo responsable</strong>. Ambos cambios quedarán registrados en Movimientos y podrán revertirse (con eliminación en cascada de movimientos posteriores).';
   } else if (sede) {
-    msg = '📦 Solo se cambiará la <strong>sede</strong> del bien. El responsable actual (si tiene) no se modifica.';
+    msg = '📦 Solo se cambiará la <strong>sede</strong> del bien. El responsable actual no se modifica. Reversible desde Movimientos (elimina en cascada los movimientos posteriores de esta instancia).';
   } else if (resp) {
-    msg = '👤 Solo se asignará un <strong>nuevo responsable</strong>. El bien permanece en su sede actual.';
+    msg = '👤 Solo se asignará un <strong>nuevo responsable</strong>. El bien permanece en su sede actual. Reversible desde Movimientos (elimina en cascada los movimientos posteriores de esta instancia).';
   }
   leyenda.innerHTML = msg;
   leyenda.style.display = msg ? 'block' : 'none';
@@ -2389,6 +2389,10 @@ async function revertirMovimiento(movId) {
     const instId = mov.instanciaId;
     const movsPost = movimientosData.filter(m => m.id !== movId && m.instanciaId === instId);
     if (movsPost.length) cascadaMsg = `\n\nSe eliminarán también ${movsPost.length} movimiento(s) posteriores de esta instancia.`;
+  } else if (mov.tipo === 'TRANSFERENCIA') {
+    const instId = mov.instanciaId;
+    const movsPost = movimientosData.filter(m => m.id !== movId && m.instanciaId === instId);
+    if (movsPost.length) cascadaMsg = `\n\nSe eliminarán también ${movsPost.length} movimiento(s) posteriores de esta instancia (actualizaciones, transferencias).`;
   }
 
   if (!confirm(`¿Revertir esta ${tipoLabel}?\nEsta acción deshará el efecto en el inventario.${cascadaMsg}`)) return;
@@ -2425,6 +2429,8 @@ async function revertirMovimiento(movId) {
     } else if (mov.tipo === 'TRANSFERENCIA') {
       const instId = mov.instanciaId;
       if (!instId) { toast('No se puede revertir: faltan datos', 'err'); return; }
+      // Cascada: eliminar movimientos posteriores de esta instancia
+      const nCascada = await eliminarMovsCascada([instId], movId);
       // Revertir usando diffsData si existe, sino fallback a sedeOrigen
       const revertUpdates = { updatedAt: new Date().toISOString() };
       if (mov.diffsData && mov.diffsData.length) {
@@ -2436,7 +2442,7 @@ async function revertirMovimiento(movId) {
       await db.collection('insumos_instancias').doc(instId).update(revertUpdates);
       const idx = instanciasData.findIndex(x => x.id === instId);
       if (idx >= 0) Object.assign(instanciasData[idx], revertUpdates);
-      toast(`✓ Transferencia revertida — ${instId}`, 'ok');
+      toast(`✓ Transferencia revertida — ${instId}${nCascada ? ` + ${nCascada} movimiento(s) en cascada` : ''}`, 'ok');
 
     } else if (mov.tipo === 'ACTUALIZACION') {
       const instId = mov.instanciaId;

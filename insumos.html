@@ -1197,9 +1197,16 @@ function openModalTransferencia(esSol){
 // openModalRango, renderRangoModal, saveRango — eliminados (nivel ahora es por instancia)
 
 // ── DATOS DE PRUEBA Y RESET ───────────────────────────────────
+function showMsg(msg, tipo) {
+  const el = document.getElementById('toast');
+  if (!el) return;
+  el.textContent = msg;
+  el.className = 'toast show' + (tipo ? ' ' + tipo : '');
+  setTimeout(() => el.classList.remove('show'), 3400);
+}
 async function cargarDatosPrueba() {
   if (!confirm('¿Cargar datos de prueba?\nSe crearán ítems de catálogo e instancias físicas en Firebase.')) return;
-  toast('Cargando datos...', '');
+  showMsg('Cargando datos...');
   try {
     const ts = new Date().toISOString();
     // Catálogo
@@ -1243,9 +1250,9 @@ async function cargarDatosPrueba() {
     for (const inst of instancias) {
       await db.collection('insumos_instancias').doc(inst.id).set({...inst, creadoEn: ts, creadoPor: maUser.email});
     }
-    toast(`✓ ${items.length} tipos y ${instancias.length} instancias cargadas`, 'ok');
+    showMsg(`✓ ${items.length} tipos y ${instancias.length} instancias cargadas`, 'ok');
     await loadAll();
-  } catch(e) { toast('Error: ' + e.message, 'err'); }
+  } catch(e) { showMsg('Error: ' + e.message, 'err'); }
 }
 
 async function resetearBaseDatos() {

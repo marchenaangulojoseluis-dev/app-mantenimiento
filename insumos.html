@@ -1472,24 +1472,50 @@ async function exportQRLabel_OLD() {
 }
 
 // ── ESCÁNER POR CELULAR ────────────────────────────────────
-function openScanner() {
-  // Limpiar instancia anterior si existe
-  const readerEl = document.getElementById('qr-reader');
-  readerEl.innerHTML = '';
-  document.getElementById('qr-result-box').textContent = 'Esperando escaneo...';
+let scannerRunning = false;
+
+async function openScanner() {
+  // Si hay un scanner activo, destruirlo primero
+  if (html5QrScanner || scannerRunning) {
+    await destroyScanner();
+  }
+
+  // Limpiar UI
+  document.getElementById('qr-reader').innerHTML = '';
+  document.getElementById('qr-result-box').textContent = 'Apunta la cámara al código QR...';
   document.getElementById('scan-item-info').style.display = 'none';
-  
   document.getElementById('modal-scanner').classList.add('open');
 
-  html5QrScanner = new Html5Qrcode('qr-reader');
-  html5QrScanner.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 250, height: 250 } },
-    (decodedText) => { onQRScanned(decodedText); },
-    () => {}
-  ).catch(err => {
-    document.getElementById('qr-result-box').textContent = 'Error al acceder a la cámara: ' + err;
-  });
+  // Esperar un tick para que el DOM se actualice
+  await new Promise(r => setTimeout(r, 100));
+
+  try {
+    html5QrScanner = new Html5Qrcode('qr-reader');
+    scannerRunning = true;
+    await html5QrScanner.start(
+      { facingMode: 'environment' },
+      { fps: 10, qrbox: { width: 220, height: 220 } },
+      (code) => { onQRScanned(code); },
+      () => {}
+    );
+  } catch(err) {
+    document.getElementById('qr-result-box').textContent = 'Error al acceder a la cámara. Usa HTTPS.';
+    scannerRunning = false;
+    html5QrScanner = null;
+  }
+}
+
+async function destroyScanner() {
+  scannerRunning = false;
+  if (!html5QrScanner) return;
+  const scanner = html5QrScanner;
+  html5QrScanner = null;
+  try {
+    if (scanner.isScanning) await scanner.stop();
+    scanner.clear();
+  } catch(e) { /* ignorar errores al destruir */ }
+  const readerEl = document.getElementById('qr-reader');
+  if (readerEl) readerEl.innerHTML = '';
 }
 
 function onQRScanned(code) {
@@ -1521,32 +1547,9 @@ function onQRScanned(code) {
   }
 }
 
-function closeScanner() {
-  // Cerrar modal primero
-  const el = document.getElementById('modal-scanner');
-  if(el){ el.style.display = 'none'; el.classList.remove('open'); }
-  
-  // Detener cámara y destruir instancia completamente
-  if (html5QrScanner) {
-    try {
-      html5QrScanner.stop().then(() => {
-        try { html5QrScanner.clear(); } catch(e) {}
-        html5QrScanner = null;
-        // Limpiar el div del lector para la próxima vez
-        const readerEl = document.getElementById('qr-reader');
-        if(readerEl) readerEl.innerHTML = '';
-      }).catch(() => {
-        try { html5QrScanner.clear(); } catch(e) {}
-        html5QrScanner = null;
-        const readerEl = document.getElementById('qr-reader');
-        if(readerEl) readerEl.innerHTML = '';
-      });
-    } catch(e) {
-      html5QrScanner = null;
-      const readerEl = document.getElementById('qr-reader');
-      if(readerEl) readerEl.innerHTML = '';
-    }
-  }
+async function closeScanner() {
+  document.getElementById('modal-scanner').classList.remove('open');
+  await destroyScanner();
 }
 
 // ── FUNCIONES UI BÁSICAS ──────────────────────────────────

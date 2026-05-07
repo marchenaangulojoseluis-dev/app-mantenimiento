@@ -1076,6 +1076,8 @@ function buildSidebar(){
   }
   if(can('transferencia')===0 && can('solicitarTransf')===1)
     h+=`<button class="btn btn-block" onclick="openModalSolicitud('TRANSF')">📤 Solicitar transferencia</button>`;
+  if(can('entrada')===0 && can('solicitarSalida')===1)
+    h+=`<button class="btn btn-block" onclick="openModalSolicitud('ENTRADA')">📋 Solicitar entrada (requerimiento)</button>`;
   // Badge de pendientes para supervisores/admins
   if(can('aprobar')===1) {
     const nPend = movimientosData.filter(m=>m.estado==='PENDIENTE').length;
@@ -1314,7 +1316,7 @@ function renderMovimientos(){
   });
   const c=document.getElementById('movimientos-list');
   if(!list.length){c.innerHTML='<div class="empty"><div class="empty-icon">📋</div>Sin movimientos</div>';return;}
-  const icons={ENTRADA:'⬇️',SALIDA:'⬆️',BAJA:'⚠️',TRANSFERENCIA:'🔄',SOLICITUD_SALIDA:'⏳',SOLICITUD_TRANSF:'⏳',ACTUALIZACION:'✏️'};
+  const icons={ENTRADA:'⬇️',SALIDA:'⬆️',BAJA:'⚠️',TRANSFERENCIA:'🔄',SOLICITUD_SALIDA:'⏳',SOLICITUD_TRANSF:'⏳',SOLICITUD_ENTRADA:'📋',ACTUALIZACION:'✏️'};
   c.innerHTML='<div class="mov-list">'+list.map(m=>{
     const f=m.fecha?(m.fecha.toDate?m.fecha.toDate():new Date(m.fecha)):new Date();
     const fs=f.toLocaleDateString('es-PE',{day:'2-digit',month:'short',year:'numeric'});
@@ -1331,7 +1333,8 @@ function renderMovimientos(){
     // Detalle de cambios para ACTUALIZACION
     const cambiosInfo = m.tipo==='ACTUALIZACION' && m.cambios ? `<span style="font-size:10px;color:var(--muted2)"> · ${m.cambios}</span>` : '';
     const badge=m.estado==='PENDIENTE'?`<span class="tipo-badge tipo-pendiente">⏳ pendiente</span>`:m.estado==='RECHAZADO'?`<span class="tipo-badge" style="background:var(--red-bg);color:var(--red);border:1px solid var(--red-border)" title="${m.motivoRechazo||''}">✗ rechazado</span>`:m.estado==='APROBADO'?`<span class="tipo-badge" style="background:var(--green-bg);color:var(--green);border:1px solid var(--green-border)">✓ aprobado</span>`:'';
-    const canMod=can('eliminarMov')&&!isPend;
+    const esSolicitud = m.tipo==='SOLICITUD_SALIDA'||m.tipo==='SOLICITUD_TRANSF';
+    const canMod=can('eliminarMov')&&!isPend&&!(esSolicitud&&(m.estado==='APROBADO'||m.estado==='RECHAZADO'));
     const delBtn=canMod?`<button class="btn btn-sm btn-red" title="Revertir acción" onclick="revertirMovimiento('${m.id}')">↩ Revertir</button>`:'';
     const editBtn=canMod&&can('editarMov')?`<button class="btn btn-sm" title="Editar" onclick="editarMovimiento('${m.id}')">✏️</button>`:'';
     const aprobarBtn=isPend&&can('aprobar')===1?`<button class="btn btn-sm btn-green" onclick="aprobarSolicitud('${m.id}')">✓ Aprobar</button><button class="btn btn-sm btn-red" onclick="rechazarSolicitud('${m.id}')">✗ Rechazar</button>`:'';
@@ -2533,23 +2536,28 @@ async function exportSelectedQRZip() {
 // ── REVERTIR MOVIMIENTO ───────────────────────────────────
 let editingMovId = null;
 
-// Elimina en cascada todos los movimientos que referencien una instancia (excepto el movimiento actual)
-async function eliminarMovsCascada(instIds, excludeMovId) {
-  const movsACascada = movimientosData.filter(m =>
-    m.id !== excludeMovId && (
-      (m.instanciaId && instIds.includes(m.instanciaId)) ||
-      (m.instancias && m.instancias.some(id => instIds.includes(id)))
-    )
-  );
+// Elimina en cascada movimientos POSTERIORES que referencien una instancia
+// Excluye: el movimiento actual, ENTRADAs (origen), SOLICITUDes ya procesadas
+async function eliminarMovsCascada(instIds, excludeMovId, fromFecha=null) {
+  const excludeMov = movimientosData.find(x => x.id === excludeMovId);
+  const refFecha = fromFecha || (excludeMov?.fecha ? (excludeMov.fecha.toDate ? excludeMov.fecha.toDate() : new Date(excludeMov.fecha)) : new Date(0));
+  const movsACascada = movimientosData.filter(m => {
+    if (m.id === excludeMovId) return false;
+    // No eliminar ENTRADAs (son el origen, van hacia atrás)
+    if (m.tipo === 'ENTRADA') return false;
+    // No eliminar SOLICITUDes ya procesadas (no tienen efecto en inventario)
+    if ((m.tipo === 'SOLICITUD_SALIDA' || m.tipo === 'SOLICITUD_TRANSF') && m.estado !== 'PENDIENTE') return false;
+    const mFecha = m.fecha ? (m.fecha.toDate ? m.fecha.toDate() : new Date(m.fecha)) : new Date(0);
+    // Solo posteriores al movimiento que se revierte
+    if (mFecha <= refFecha) return false;
+    return (m.instanciaId && instIds.includes(m.instanciaId)) ||
+           (m.instancias && m.instancias.some(id => instIds.includes(id)));
+  });
   for (const m of movsACascada) {
     await db.collection('insumos_movimientos').doc(m.id).delete();
   }
-  movimientosData = movimientosData.filter(m =>
-    m.id === excludeMovId || (
-      !(m.instanciaId && instIds.includes(m.instanciaId)) &&
-      !(m.instancias && m.instancias.some(id => instIds.includes(id)))
-    )
-  );
+  const cascadaIds = new Set(movsACascada.map(m => m.id));
+  movimientosData = movimientosData.filter(m => !cascadaIds.has(m.id));
   return movsACascada.length;
 }
 
@@ -2804,13 +2812,15 @@ function openModalSolicitud(tipo) {
   currentSolicitudTipo = tipo;
   const esBaja = tipo === 'BAJA';
   const esTransf = tipo === 'TRANSF';
+  const esEntrada = tipo === 'ENTRADA';
   document.getElementById('modal-solic-title').textContent =
-    esTransf ? '📤 Solicitar transferencia' : esBaja ? '📤 Solicitar baja' : '📤 Solicitar salida';
+    esTransf ? '📤 Solicitar transferencia' : esBaja ? '📤 Solicitar baja' : esEntrada ? '📋 Solicitar entrada' : '📤 Solicitar salida';
   document.getElementById('modal-solic-sub').innerHTML =
     esTransf ? '🔄 Tu solicitud será revisada por un supervisor antes de ejecutarse.'
     : esBaja ? '⚠️ Solicitas dar de baja un bien. El supervisor decidirá si procede.'
+    : esEntrada ? '📋 Solicitas el ingreso de nuevos bienes. El supervisor gestionará la entrada cuando estén disponibles.'
     : '📤 Solicitas la salida de un bien. El supervisor deberá aprobarla.';
-  document.getElementById('fsol-salida-fields').style.display = esTransf ? 'none' : 'block';
+  document.getElementById('fsol-salida-fields').style.display = (esTransf||esEntrada) ? 'none' : 'block';
   document.getElementById('fsol-transf-fields').style.display = esTransf ? 'block' : 'none';
   document.getElementById('fsol-motivo').value = '';
   document.getElementById('fsol-inst-info').style.display = 'none';
@@ -2853,20 +2863,23 @@ async function saveSolicitud() {
   const motivo = document.getElementById('fsol-motivo').value.trim();
   if (!motivo) { toast('El motivo es obligatorio', 'err'); return; }
   let instId, itemId, itemNombre, sede, sedeDestino;
+  const esEntrada = currentSolicitudTipo === 'ENTRADA';
   if (esTransf) {
     instId = document.getElementById('fsol-inst-transf').value;
     sedeDestino = document.getElementById('fsol-sede-dest').value;
     if (!instId || !sedeDestino) { toast('Completa todos los campos', 'err'); return; }
-  } else {
+  } else if (!esEntrada) {
     instId = document.getElementById('fsol-instancia').value;
     if (!instId) { toast('Selecciona una instancia', 'err'); return; }
   }
-  const inst = instanciasData.find(x => x.id === instId);
-  if (!inst) { toast('Instancia no encontrada', 'err'); return; }
-  itemId = inst.itemId; itemNombre = inst.nombre; sede = inst.sede;
+  if (!esEntrada) {
+    const inst = instanciasData.find(x => x.id === instId);
+    if (!inst) { toast('Instancia no encontrada', 'err'); return; }
+    itemId = inst.itemId; itemNombre = inst.nombre; sede = inst.sede;
+  }
   try {
     const movData = {
-      tipo: esTransf ? 'SOLICITUD_TRANSF' : 'SOLICITUD_SALIDA',
+      tipo: esEntrada ? 'SOLICITUD_ENTRADA' : esTransf ? 'SOLICITUD_TRANSF' : 'SOLICITUD_SALIDA',
       subTipo: currentSolicitudTipo,
       itemId, itemNombre, instanciaId: instId,
       sede, sedeDestino: sedeDestino || null,
@@ -2888,7 +2901,14 @@ async function aprobarSolicitud(movId) {
   const inst = instanciasData.find(x => x.id === mov.instanciaId);
   if (!inst) { toast('La instancia ya no existe', 'err'); return; }
   try {
-    if (mov.tipo === 'SOLICITUD_SALIDA') {
+    if (mov.tipo === 'SOLICITUD_ENTRADA') {
+    // Para entrada: solo marcar como aprobado, el admin registra la entrada manualmente
+    await db.collection('insumos_movimientos').doc(movId).update({ estado: 'APROBADO', aprobadoPor: maUser.email });
+    const idx2 = movimientosData.findIndex(x => x.id === movId);
+    if (idx2 >= 0) movimientosData[idx2].estado = 'APROBADO';
+    toast('✓ Requerimiento aprobado — registra la entrada desde el sidebar cuando el bien llegue', 'ok');
+    buildSidebar(); renderMovimientos(); return;
+  } else if (mov.tipo === 'SOLICITUD_SALIDA') {
       // Ejecutar la salida/baja real
       await db.collection('insumos_instancias').doc(mov.instanciaId).delete();
       instanciasData = instanciasData.filter(x => x.id !== mov.instanciaId);

@@ -1193,32 +1193,30 @@ function renderStockSede(){
       if(!items.length && !instsSede.length)return;
       h+=`<div class="sede-stock-card"><div class="sede-stock-name">🏢 ${sede}</div>
       ${items.map(i=>{
-        const q=sEnSede(i.id,sede);
         const canEdit=can('editarItem');
-        if(i.tipoCantidad==='RANGO'){
-          const instsDeEste = instanciasData.filter(x => x.itemId === i.id && x.sede === sede && x.estado !== 'BAJA');
-          if(!instsDeEste.length) return '';
-          const header = `<div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 2px">${i.nombre}</div>`;
-          const rows = instsDeEste.map(inst=>{
+        const instsDeEste = instanciasData.filter(x => x.itemId === i.id && x.sede === sede && x.estado !== 'BAJA');
+        if(!instsDeEste.length) return '';
+        const header = `<div style="font-size:10px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.06em;padding:6px 0 2px">${i.nombre}</div>`;
+        const rows = instsDeEste.map(inst=>{
+          const editBtn = canEdit ? `<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" onclick="openEditInstancia('${inst.id}')">✏️</button>` : '';
+          if(i.tipoCantidad==='RANGO'){
             const niv = inst.nivel !== undefined ? inst.nivel : 0;
-            const editBtn = canEdit ? `<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" onclick="openEditInstancia('${inst.id}')">✏️ Nivel</button>` : '';
             return `<div class="sede-stock-item">
               <span style="flex:1;font-family:var(--mono);font-size:11px;font-weight:600">${inst.id}</span>
               ${renderRangoBadgeSede(niv)}
               ${editBtn}
             </div>`;
-          }).join('');
-          return header + rows;
-        }
-        const n=q<=0?'stock-out':(Number(i.stockMin)>0&&q<=Number(i.stockMin))?'stock-low':'stock-ok';
-        const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0"
-          ontouchend="openModalSalida('SALIDA')"
-          onclick="openModalSalida('SALIDA')">✏️</button>`:'';
-        return`<div class="sede-stock-item">
-          <span style="flex:1">${i.nombre}</span>
-          <span class="stock-pill ${n}" style="font-size:10px;padding:1px 6px;flex-shrink:0">${q} ${i.unidad||'UND'}</span>
-          ${editBtn}
-        </div>`;
+          }
+          const estColor = {DISPONIBLE:'stock-ok',EN_USO:'stock-ok',MANTENIMIENTO:'stock-low',DETERIORADO:'stock-low',BAJA:'stock-out'};
+          const estLabel = {DISPONIBLE:'✅',EN_USO:'🔧',MANTENIMIENTO:'⚠️',DETERIORADO:'🔴'};
+          const est = inst.estado || 'DISPONIBLE';
+          return `<div class="sede-stock-item">
+            <span style="flex:1;font-family:var(--mono);font-size:11px;font-weight:600">${inst.id}</span>
+            <span class="stock-pill ${estColor[est]||'stock-ok'}" style="font-size:10px;padding:1px 6px;flex-shrink:0">${estLabel[est]||''} ${est}</span>
+            ${editBtn}
+          </div>`;
+        }).join('');
+        return header + rows;
       }).join('')}</div>`;
     });
     h+='</div>';

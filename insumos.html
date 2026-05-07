@@ -1105,9 +1105,7 @@ function renderCatalogo(){
     const pC=n==='ok'?'stock-ok':n==='low'?'stock-low':'stock-out';
     const cC=item.categoria==='INSUMO'?'cat-insumo':'cat-herramienta';
     const cL=item.categoria==='INSUMO'?'🔧 Insumo':'🛠 Herramienta';
-    const stockDisplay=item.tipoCantidad==='RANGO'
-      ? renderRangoBadge(t,item)
-      : `<span class="stock-pill ${pC}">${t} ${item.unidad||'UND'}</span>`;
+    const stockDisplay=`<span class="stock-pill ${pC}">${t} ${item.unidad||'UND'}</span>`;
     const acts=isEd?`<td><div class="td-actions">
       <button class="btn btn-sm" onclick="openModalInsumo('${item.id}')">✏️</button>
       <button class="qr-btn" onclick="openQRModal('${item.id}')" title="Ver QR">▣</button>
@@ -1198,12 +1196,16 @@ function renderStockSede(){
         const q=sEnSede(i.id,sede);
         const canEdit=can('editarItem');
         if(i.tipoCantidad==='RANGO'){
+          // Nivel promedio real de instancias en esta sede
+          const instsSede = instanciasData.filter(x => x.itemId === i.id && x.sede === sede && x.nivel !== undefined && x.estado !== 'BAJA');
+          const nivelProm = instsSede.length ? Math.round(instsSede.reduce((a,x)=>a+(x.nivel||0),0)/instsSede.length) : 0;
+          const cantLabel = `${q} ${i.unidad||'UND'}`;
           const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" 
             ontouchend="openRangoDesde('${i.id}','${sede}')" 
             onclick="openRangoDesde('${i.id}','${sede}')">📊 Nivel</button>`:'';
           return`<div class="sede-stock-item">
-            <span style="flex:1">${i.nombre}</span>
-            ${renderRangoBadgeSede(q)}
+            <span style="flex:1">${i.nombre} <span style="color:var(--muted2);font-size:10px">(${cantLabel})</span></span>
+            ${renderRangoBadgeSede(nivelProm)}
             ${editBtn}
           </div>`;
         }

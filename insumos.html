@@ -859,6 +859,70 @@ function populateSedes(){
 
 function renderAll(){applyFilters();renderMovimientos();renderStockSede();renderStats();renderAlerts();renderInstancias();}
 
+function renderInstancias() {
+  const wrap = document.getElementById('instancias-table');
+  if (!wrap) return;
+  const q = (document.getElementById('q-inst')?.value || '').toLowerCase();
+  const tipo = document.getElementById('f-inst-tipo')?.value || '';
+  const sede = document.getElementById('f-inst-sede')?.value || '';
+
+  // Poblar filtros si están vacíos
+  const tipoSel = document.getElementById('f-inst-tipo');
+  if (tipoSel && tipoSel.options.length <= 1) {
+    catalogoData.forEach(i => {
+      const opt = document.createElement('option');
+      opt.value = i.id; opt.textContent = i.nombre;
+      tipoSel.appendChild(opt);
+    });
+  }
+  const sedeSel = document.getElementById('f-inst-sede');
+  if (sedeSel && sedeSel.options.length <= 1) {
+    sedes.forEach(s => {
+      const opt = document.createElement('option');
+      opt.value = s.sede; opt.textContent = s.sede;
+      sedeSel.appendChild(opt);
+    });
+  }
+
+  let list = instanciasData.filter(inst => {
+    if (tipo && inst.itemId !== tipo) return false;
+    if (sede && inst.sede !== sede) return false;
+    if (q && !(inst.id + inst.nombre + (inst.sede||'')).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty"><div class="empty-icon">🏷️</div>Sin instancias registradas</div>';
+    return;
+  }
+
+  const estadoColor = {DISPONIBLE:'ok', EN_USO:'ok', MANTENIMIENTO:'low', DETERIORADO:'low', BAJA:'out'};
+  const estadoLabel = {DISPONIBLE:'✅ Disponible', EN_USO:'🔧 En uso', MANTENIMIENTO:'⚠️ Mantenimiento', DETERIORADO:'🔴 Deteriorado', BAJA:'❌ Baja'};
+
+  wrap.innerHTML = `<table><thead><tr>
+    <th>ID / QR</th><th>Tipo</th><th>Sede</th><th>Nivel</th><th>Estado</th><th></th>
+  </tr></thead><tbody>
+  ${list.map(inst => {
+    const item = catalogoData.find(x => x.id === inst.itemId);
+    const esRango = item && item.tipoCantidad === 'RANGO';
+    const nivelHtml = esRango && inst.nivel !== undefined ? renderRangoBadgeSede(inst.nivel) : '—';
+    const est = inst.estado || 'DISPONIBLE';
+    const estColor = estadoColor[est] || 'ok';
+    return `<tr>
+      <td class="td-code" style="font-weight:700">${inst.id}</td>
+      <td style="font-size:11px">${inst.nombre || (item ? item.nombre : '—')}</td>
+      <td style="font-size:11px">${inst.sede || '—'}</td>
+      <td>${nivelHtml}</td>
+      <td><span class="stock-pill stock-${estColor}" style="font-size:9px">${estadoLabel[est]||est}</span></td>
+      <td><div style="display:flex;gap:4px">
+        <button class="btn btn-sm" onclick="openQRModal('${inst.id}')" title="Ver QR">▣</button>
+        <button class="btn btn-sm" onclick="openEditInstancia('${inst.id}')">✏️</button>
+      </div></td>
+    </tr>`;
+  }).join('')}
+  </tbody></table>`;
+}
+
 function renderStats(){
   let ok=0,low=0,out=0;
   catalogoData.forEach(i=>{const n=sNivel(i);if(n==='ok')ok++;else if(n==='low')low++;else out++;});

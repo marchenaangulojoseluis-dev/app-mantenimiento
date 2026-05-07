@@ -229,7 +229,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
 .sede-stock-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:13px}
 .sede-cliente-label{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.1em;color:var(--orange);margin:14px 0 8px}
 .sede-stock-name{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:8px}
-.sede-stock-item{display:flex;justify-content:space-between;font-size:11px;padding:4px 0;border-bottom:1px solid var(--border)}
+.sede-stock-item{display:flex;align-items:center;justify-content:space-between;font-size:11px;padding:6px 0;border-bottom:1px solid var(--border);gap:6px}
 .sede-stock-item:last-child{border-bottom:none}
 .alert-banner{border-radius:8px;padding:9px 13px;display:flex;align-items:center;gap:9px;font-size:12px;margin-bottom:8px}
 .alert-yellow{background:var(--yellow-bg);border:1px solid var(--yellow-border)}
@@ -1085,16 +1085,53 @@ function renderStockSede(){
       h+=`<div class="sede-stock-card"><div class="sede-stock-name">🏢 ${sede}</div>
       ${items.map(i=>{
         const q=sEnSede(i.id,sede);
+        const canEdit=can('editarItem');
         if(i.tipoCantidad==='RANGO'){
-          return`<div class="sede-stock-item"><span>${i.nombre}</span>${renderRangoBadgeSede(q)}</div>`;
+          const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0" 
+            ontouchend="openRangoDesde('${i.id}','${sede}')" 
+            onclick="openRangoDesde('${i.id}','${sede}')">📊 Nivel</button>`:'';
+          return`<div class="sede-stock-item">
+            <span style="flex:1">${i.nombre}</span>
+            ${renderRangoBadgeSede(q)}
+            ${editBtn}
+          </div>`;
         }
         const n=q<=0?'stock-out':(Number(i.stockMin)>0&&q<=Number(i.stockMin))?'stock-low':'stock-ok';
-        return`<div class="sede-stock-item"><span>${i.nombre}</span><span class="stock-pill ${n}" style="font-size:10px;padding:1px 6px">${q} ${i.unidad||'UND'}</span></div>`;
+        const editBtn=canEdit?`<button class="btn btn-sm" style="font-size:10px;padding:3px 7px;flex-shrink:0"
+          ontouchend="openModalMovimientoDesde('${i.id}','${sede}')"
+          onclick="openModalMovimientoDesde('${i.id}','${sede}')">✏️</button>`:'';
+        return`<div class="sede-stock-item">
+          <span style="flex:1">${i.nombre}</span>
+          <span class="stock-pill ${n}" style="font-size:10px;padding:1px 6px;flex-shrink:0">${q} ${i.unidad||'UND'}</span>
+          ${editBtn}
+        </div>`;
       }).join('')}</div>`;
     });
     h+='</div>';
   });
   c.innerHTML=h||'<div class="empty"><div class="empty-icon">📦</div>Sin stock por sede</div>';
+}
+
+// Abrir modal de movimiento con sede pre-seleccionada
+function openModalMovimientoDesde(itemId, sede) {
+  openModalMovimiento(itemId, can('registrarSalida') ? 'SALIDA' : 'SOLICITUD_SALIDA');
+  setTimeout(() => {
+    const sedeSelect = document.getElementById('fm-sede');
+    if (sedeSelect) { sedeSelect.value = sede; updateStockInfo(); }
+  }, 100);
+}
+
+// Abrir modal de rango con ítem y sede pre-seleccionados
+function openRangoDesde(itemId, sede) {
+  rangoItemId = itemId;
+  renderRangoModal();
+  // Highlight de la sede
+  setTimeout(() => {
+    const sedeKey = sede.replace(/\s/g,'_');
+    const sel = document.getElementById('rango-sede-' + sedeKey);
+    if(sel) sel.style.outline = '2px solid var(--blue)';
+  }, 150);
+  document.getElementById('modal-rango').classList.add('open');
 }
 
 function toggleStockMinField(){

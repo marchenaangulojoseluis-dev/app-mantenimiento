@@ -2169,13 +2169,12 @@ async function saveEntrada() {
   const btn = document.querySelector('#modal-entrada .btn-primary');
   if (btn && btn.disabled) return;
   if (btn) { btn.disabled = true; btn._origText = btn.textContent; btn.textContent = '⏳ Guardando...'; }
-  try {
   const itemId = document.getElementById('fent-tipo').value;
   const sede = document.getElementById('fent-sede').value;
   const qty = parseInt(document.getElementById('fent-qty').value) || 0;
-  if (!itemId || !sede || qty <= 0) { toast('Completa todos los campos', 'err'); return; }
+  if (!itemId || !sede || qty <= 0) { toast('Completa todos los campos', 'err'); if(btn){btn.disabled=false;btn.textContent=btn._origText;} return; }
   const item = catalogoData.find(x => x.id === itemId);
-  if (!item) return;
+  if (!item) { if(btn){btn.disabled=false;btn.textContent=btn._origText;} return; }
   const prefix = (item.codigo || item.nombre.replace(/[^A-Z0-9]/gi, '')).substring(0, 3).toUpperCase();
   const existing = instanciasData.filter(i => i.id.startsWith(prefix + '-')).map(i => parseInt(i.id.replace(prefix + '-', '')) || 0).sort((a, b) => b - a);
   let next = (existing[0] || 0) + 1;
@@ -2260,15 +2259,14 @@ async function saveSalida() {
   const btn = document.querySelector('#modal-salida .btn-primary');
   if (btn && btn.disabled) return;
   if (btn) { btn.disabled = true; btn._origText = btn.textContent; btn.textContent = '⏳ Guardando...'; }
-  try {
   const instId = document.getElementById('fsal-instancia').value;
   const motivo = document.getElementById('fsal-motivo').value.trim();
   const resp = document.getElementById('fsal-personal').value;
   const esBaja = currentSalidaTipo === 'BAJA';
-  if (!instId) { toast('Selecciona una instancia', 'err'); return; }
-  if (esBaja && !motivo) { toast('El motivo es obligatorio para dar de baja', 'err'); return; }
+  if (!instId) { toast('Selecciona una instancia', 'err'); if(btn){btn.disabled=false;btn.textContent=btn._origText;} return; }
+  if (esBaja && !motivo) { toast('El motivo es obligatorio para dar de baja', 'err'); if(btn){btn.disabled=false;btn.textContent=btn._origText;} return; }
   const inst = instanciasData.find(x => x.id === instId);
-  if (!inst) return;
+  if (!inst) { if(btn){btn.disabled=false;btn.textContent=btn._origText;} return; }
   try {
     await db.collection('insumos_instancias').doc(instId).delete();
     instanciasData = instanciasData.filter(x => x.id !== instId);
@@ -3108,7 +3106,6 @@ async function saveSolicitud() {
   const btn = document.querySelector('#modal-solicitud .btn-primary');
   if (btn && btn.disabled) return;
   if (btn) { btn.disabled = true; btn._origText = btn.textContent; btn.textContent = '⏳ Enviando...'; }
-  try {
   const esTransf = currentSolicitudTipo === 'TRANSF';
   const motivo = document.getElementById('fsol-motivo').value.trim();
   if (!motivo) { toast('El motivo es obligatorio', 'err'); return; }

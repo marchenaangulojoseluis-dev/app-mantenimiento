@@ -1300,7 +1300,21 @@ function populateSedes(){
   ['fap-sede'].forEach(id=>{const el=document.getElementById(id);if(el)el.innerHTML=sedeOpts(false);});
 }
 
-function renderAll(){applyFilters();renderMovimientos();renderStockSede();renderStats();renderAlerts();renderInstancias();renderPaquetes();renderPorTecnico();}
+function renderAll(){
+  applyFilters();renderMovimientos();renderStockSede();renderStats();renderAlerts();renderInstancias();renderPaquetes();renderPorTecnico();
+  // Repoblar selector de técnico con todos los responsables actuales
+  const fTec = document.getElementById('f-tec-persona');
+  if(fTec) {
+    const current = fTec.value;
+    const responsables = [...new Set([
+      ...personalData.map(p=>p.nombre),
+      ...paquetesData.map(p=>p.responsable).filter(Boolean),
+      ...instanciasData.map(i=>i.responsable).filter(Boolean)
+    ])].sort();
+    fTec.innerHTML = '<option value="">Seleccionar técnico...</option>' + responsables.map(r=>`<option value="${r}">${r}</option>`).join('');
+    if(current) fTec.value = current;
+  }
+}
 
 function renderInstancias() {
   selectedInstQRIds.clear();
@@ -2171,6 +2185,7 @@ async function saveEntrada() {
       if (snap.exists) { next++; i--; continue; }
       const inst = { itemId, nombre: item.nombre.toUpperCase(), sede, estado: 'DISPONIBLE',
         creadoEn: new Date().toISOString(), creadoPor: maUser.email,
+        ...(resp && { responsable: resp }),
         ...(item.tipoCantidad === 'RANGO' && { nivel: Number(document.getElementById('fent-nivel').value) }) };
       await db.collection('insumos_instancias').doc(id).set(inst);
       instanciasData.push({ id, ...inst });

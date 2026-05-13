@@ -454,25 +454,30 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
   </div>
 </div>
 
-<!-- PANEL ACCESOS -->
-<div class="overlay" id="access-overlay" onclick="if(event.target===this)closeAccessPanel()" style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:500;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
-  <div style="background:#fff;border:1.5px solid #d0daf0;border-radius:14px;width:560px;max-width:100%;overflow:hidden;box-shadow:var(--shadow-lg)">
-    <div style="padding:18px 22px;border-bottom:1.5px solid #d0daf0;background:#e8eef8;display:flex;align-items:center;gap:10px">
-      <h2 style="font-size:14px;font-weight:700;color:#1B3F8B;flex:1">⚙️ Gestión de accesos</h2>
-      <button onclick="closeAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px">✕</button>
+<!-- PANEL DE ACCESOS UNIFICADO -->
+<div id="ma-access-overlay" style="display:none;position:fixed;inset:0;background:rgba(10,20,50,.5);z-index:9000;align-items:flex-start;justify-content:center;padding:40px 20px;overflow-y:auto">
+  <div style="background:#fff;border:1.5px solid #d0daf0;border-radius:14px;width:580px;max-width:100%;overflow:hidden;box-shadow:0 8px 32px rgba(27,63,139,.18)">
+    <div style="padding:16px 22px;border-bottom:1.5px solid #d0daf0;background:#e8eef8;display:flex;align-items:center;gap:10px">
+      <span style="font-size:14px;font-weight:700;color:#1B3F8B;flex:1">⚙️ Gestión de accesos</span>
+      <button onclick="maCloseAccessPanel()" style="background:none;border:1px solid #d0daf0;border-radius:6px;padding:4px 10px;cursor:pointer;font-size:12px;font-family:inherit">✕</button>
     </div>
-    <div style="padding:20px 22px">
-      <p style="font-size:12px;color:#6a7a9a;margin-bottom:16px">Administra los usuarios que pueden acceder al sistema. Solo admins pueden ver este panel.</p>
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <input type="email" id="new-user-email" placeholder="correo@ejemplo.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
-        <select id="new-user-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none;background:#fff">
-          <option value="USUARIO">USUARIO</option>
-          <option value="ADMIN">ADMIN</option>
-        </select>
-        <button onclick="addUserAccess()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit">+ Agregar</button>
+    <div style="padding:18px 22px">
+      <div style="background:#f5f8ff;border-left:3px solid #1B3F8B;border-radius:0 6px 6px 0;padding:10px 14px;font-size:11px;color:#6a7a9a;line-height:1.8;margin-bottom:16px">
+        <strong style="color:#1a9e5a">TÉCNICO</strong> — solo app de fichaje (entrada con foto)<br>
+        <strong style="color:#6b3fa0">SUPERVISOR</strong> — acceso a asistencia y registro de equipo<br>
+        <strong style="color:#1B3F8B">ADMIN</strong> — gestión completa<br>
+        <strong style="color:#d4621a">SUPER ADMIN</strong> — acceso total sin restricciones
       </div>
-      <div id="access-users-list" style="display:flex;flex-direction:column;gap:6px;max-height:350px;overflow-y:auto">
-        <div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Cargando...</div>
+      <div id="ma-access-list" style="display:flex;flex-direction:column;gap:0;margin-bottom:16px;max-height:320px;overflow-y:auto"></div>
+      <div style="display:flex;gap:8px;padding-top:12px;border-top:1px solid #d0daf0">
+        <input type="email" id="ma-new-email" placeholder="nuevo@email.com" style="flex:1;padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:13px;font-family:inherit;outline:none">
+        <select id="ma-new-rol" style="padding:8px 12px;border:1.5px solid #d0daf0;border-radius:8px;font-size:12px;font-family:inherit;outline:none;background:#fff">
+          <option value="TECNICO">TÉCNICO</option>
+          <option value="SUPERVISOR">SUPERVISOR</option>
+          <option value="ADMIN">ADMIN</option>
+          <option value="SUPER_ADMIN">SUPER ADMIN</option>
+        </select>
+        <button onclick="maAddUser()" style="padding:8px 16px;background:#1B3F8B;color:#fff;border:none;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;white-space:nowrap">+ Agregar</button>
       </div>
     </div>
   </div>
@@ -1074,64 +1079,123 @@ function renderColabsManagerList() {
 
 
 
-// ── GESTIÓN DE ACCESOS ────────────────────────────────────────────────────────
-let accessUsers = [];
+// ── PANEL DE ACCESOS UNIFICADO ────────────────────────────────────────────────
+var maAccessUsers = [];
+var MA_ROLES = ['TECNICO','SUPERVISOR','ADMIN','SUPER_ADMIN'];
+var MA_ROL_COLORS = {TECNICO:'#1a9e5a',SUPERVISOR:'#6b3fa0',ADMIN:'#1B3F8B',SUPER_ADMIN:'#d4621a'};
+var MA_ROL_BGS    = {TECNICO:'#f0faf5',SUPERVISOR:'#f3eeff',ADMIN:'#e8eef8',SUPER_ADMIN:'#fff3eb'};
+
 function openAccessPanel() {
-  if (!maUser || !['ADMIN','SUPER_ADMIN'].includes(maUser.rol)) { alert('Solo administradores'); return; }
-  document.getElementById('access-overlay').style.display = 'flex';
-  loadAccessUsers();
-  const menu = document.getElementById('user-menu');
+  if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) return;
+  var menu = document.getElementById('user-menu');
   if (menu) menu.classList.remove('open');
+  window.__db.collection('usuarios').get().then(function(snap) {
+    maAccessUsers = snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); });
+    maRenderAccessPanel();
+    document.getElementById('ma-access-overlay').style.display = 'flex';
+  });
 }
-function closeAccessPanel() { document.getElementById('access-overlay').style.display = 'none'; }
-async function loadAccessUsers() {
-  const list = document.getElementById('access-users-list');
-  list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Cargando...</div>';
-  const snap = await window.__db.collection('usuarios').get();
-  accessUsers = snap.docs.map(d => d.data()).sort((a, b) => a.email.localeCompare(b.email));
-  renderAccessUsers();
+
+function maCloseAccessPanel() {
+  document.getElementById('ma-access-overlay').style.display = 'none';
 }
-function renderAccessUsers() {
-  const list = document.getElementById('access-users-list');
-  if (!accessUsers.length) { list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Sin usuarios</div>'; return; }
-  list.innerHTML = accessUsers.map(u => {
-    const isMe = maUser && u.email === maUser.email;
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:#f5f8ff;border:1.5px solid #d0daf0;border-radius:8px">
-      <div style="flex:1;font-size:13px">${u.email}${isMe ? ' <span style="font-size:10px;color:#1B3F8B">(tú)</span>' : ''}</div>
-      <select data-email="${u.email}" onchange="changeUserRolByEl(this)" style="padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;outline:none"${isMe ? ' disabled' : ''}>
-        <option value="USUARIO"${u.rol === 'USUARIO' ? ' selected' : ''}>USUARIO</option>
-        <option value="ADMIN"${u.rol === 'ADMIN' ? ' selected' : ''}>ADMIN</option>
-      </select>
-      ${!isMe ? `<button onclick="removeUserAccess('${u.email}')" style="background:none;border:none;color:#d63344;cursor:pointer;font-size:16px;padding:2px 6px">✕</button>` : ''}
-    </div>`;
+
+function maRenderAccessPanel() {
+  var list = document.getElementById('ma-access-list');
+  if (!maAccessUsers.length) { list.innerHTML = '<div style="text-align:center;color:#8a9ab8;font-size:12px;padding:16px">Sin usuarios</div>'; return; }
+  var iAmSuperAdmin = maUser && maUser.rol === 'SUPER_ADMIN';
+  var ALL_APPS = [
+    {id:'inventario',    label:'📦 Inv'},
+    {id:'mantenimiento', label:'🔧 Mant'},
+    {id:'itinerario',    label:'🗓 Iti'},
+    {id:'insumos',       label:'🧰 Ins'},
+    {id:'asistencia',    label:'🕐 Asist'}
+  ];
+  list.innerHTML = maAccessUsers.map(function(u) {
+    var isMe = maUser && u.email === maUser.email;
+    var rol = u.rol || 'TECNICO';
+    var isSuperTarget = rol === 'SUPER_ADMIN';
+    var isAdminOrSuper = rol === 'ADMIN' || rol === 'SUPER_ADMIN';
+    var canEdit = !isMe && (isSuperTarget ? iAmSuperAdmin : true);
+    var canDelete = !isMe && (isSuperTarget ? iAmSuperAdmin : true);
+    var rColor = MA_ROL_COLORS[rol] || '#6a7a9a';
+    var rBg = MA_ROL_BGS[rol] || '#f5f8ff';
+    var opts = MA_ROLES.map(function(r) { return '<option value="' + r + '"' + (rol===r?' selected':'') + '>' + r.replace('_',' ') + '</option>'; }).join('');
+    var selStyle = 'padding:4px 8px;border:1px solid #d0daf0;border-radius:6px;font-size:11px;font-weight:700;color:' + rColor + ';background:' + rBg + ';outline:none;' + (canEdit ? 'cursor:pointer' : 'cursor:not-allowed;opacity:.6');
+    var meMark = isMe ? ' <span style="font-size:9px;color:#1B3F8B;font-weight:700">(tú)</span>' : '';
+    var superMark = (isSuperTarget && !isMe) ? ' <span style="font-size:9px;color:#d4621a;font-weight:700">★</span>' : '';
+    var userApps = u.apps || [];
+    var appsHtml;
+    if (isAdminOrSuper) {
+      appsHtml = '<div style="font-size:10px;color:#d4621a;padding:6px 0 2px;font-style:italic">✓ Acceso a todas las apps por rol</div>';
+    } else {
+      appsHtml = '<div style="display:flex;gap:4px;flex-wrap:wrap;padding:6px 0 2px">' + ALL_APPS.map(function(app) {
+        var checked = userApps.indexOf(app.id) !== -1;
+        var dis = !canEdit;
+        return '<label style="display:flex;align-items:center;gap:3px;font-size:10px;padding:2px 6px;border-radius:10px;border:1px solid ' + (checked?'#1B3F8B':'#d0daf0') + ';background:' + (checked?'#e8eef8':'#fff') + ';color:' + (checked?'#1B3F8B':'#8a9ab8') + ';cursor:' + (dis?'not-allowed':'pointer') + ';' + (dis?'opacity:.5':'') + '">'
+          + '<input type="checkbox" data-email="' + u.email + '" data-app="' + app.id + '"' + (checked?' checked':'') + (dis?' disabled':'') + ' onchange="maToggleApp(this)" style="margin:0;cursor:inherit">'
+          + app.label + '</label>';
+      }).join('') + '</div>';
+    }
+    return '<div style="padding:10px 0;border-bottom:1px solid #e8eef8;font-size:12px">'
+      + '<div style="display:flex;align-items:center;gap:10px">'
+      + '<div style="flex:1;font-family:monospace;font-size:11px;color:#1a2540">' + u.email + meMark + superMark + '</div>'
+      + '<select data-email="' + u.email + '" onchange="maChangeRol(this.dataset.email,this.value)" ' + (canEdit ? '' : 'disabled ') + 'style="' + selStyle + '">' + opts + '</select>'
+      + (canDelete ? '<button data-email="' + u.email + '" onclick="maDeleteUser(this.dataset.email)" style="background:none;border:1px solid #f0c0c8;color:#d63344;border-radius:6px;padding:4px 8px;cursor:pointer;font-size:12px" title="Eliminar">🗑</button>' : '<span style="width:34px"></span>')
+      + '</div>'
+      + appsHtml
+      + '</div>';
   }).join('');
 }
-function changeUserRolByEl(sel) {
-  const email = sel.getAttribute('data-email');
-  window.__db.collection('usuarios').doc(email).set({ email, rol: sel.value });
-  const u = accessUsers.find(u => u.email === email);
-  if (u) u.rol = sel.value;
-  sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+
+function maToggleApp(cb) {
+  var email = cb.getAttribute('data-email');
+  var app = cb.getAttribute('data-app');
+  var u = maAccessUsers.find(function(x){ return x.email === email; });
+  if (!u) return;
+  if (!u.apps) u.apps = [];
+  if (cb.checked) { if (u.apps.indexOf(app) === -1) u.apps.push(app); }
+  else { u.apps = u.apps.filter(function(a){ return a !== app; }); }
+  window.__db.collection('usuarios').doc(email).update({apps: u.apps}).then(function() {
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+  }).catch(function(e) { alert('Error: ' + e.message); cb.checked = !cb.checked; });
 }
-async function addUserAccess() {
-  const email = document.getElementById('new-user-email').value.trim().toLowerCase();
-  const rol = document.getElementById('new-user-rol').value || 'USUARIO';
-  if (!email || !email.includes('@')) { alert('Email inválido'); return; }
-  if (accessUsers.find(u => u.email === email)) { alert('Ya existe'); return; }
-  await window.__db.collection('usuarios').doc(email).set({ email, rol });
-  accessUsers.push({ email, rol });
-  accessUsers.sort((a, b) => a.email.localeCompare(b.email));
-  document.getElementById('new-user-email').value = '';
-  renderAccessUsers();
-  sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+
+function maChangeRol(email, rol) {
+  window.__db.collection('usuarios').doc(email).update({rol: rol}).then(function() {
+    var u = maAccessUsers.find(function(x){ return x.email === email; });
+    if (u) u.rol = rol;
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
+  }).catch(function(e) { alert('Error: ' + e.message); });
 }
-async function removeUserAccess(email) {
+
+function maDeleteUser(email) {
   if (!confirm('¿Eliminar acceso de ' + email + '?')) return;
-  await window.__db.collection('usuarios').doc(email).delete();
-  accessUsers = accessUsers.filter(u => u.email !== email);
-  renderAccessUsers();
-  sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+  window.__db.collection('usuarios').doc(email).delete().then(function() {
+    maAccessUsers = maAccessUsers.filter(function(x){ return x.email !== email; });
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
+  }).catch(function(e) { alert('Error: ' + e.message); });
 }
+
+function maAddUser() {
+  var email = (document.getElementById('ma-new-email').value || '').trim().toLowerCase();
+  var rol = document.getElementById('ma-new-rol').value;
+  if (!email || email.indexOf('@') === -1) { alert('Ingresa un email válido'); return; }
+  if (maAccessUsers.find(function(u){ return u.email === email; })) { alert('Este usuario ya existe'); return; }
+  window.__db.collection('usuarios').doc(email).set({email: email, rol: rol, apps: []}).then(function() {
+    maAccessUsers.push({email: email, rol: rol, apps: []});
+    document.getElementById('ma-new-email').value = '';
+    sessionStorage.removeItem('ma_emails'); sessionStorage.removeItem('ma_emails_time');
+    maRenderAccessPanel();
+  }).catch(function(e) { alert('Error: ' + e.message); });
+}
+
+document.addEventListener('click', function(e) {
+  var ov = document.getElementById('ma-access-overlay');
+  if (ov && e.target === ov) maCloseAccessPanel();
+});
 
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function escHtml(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }

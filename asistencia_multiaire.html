@@ -393,17 +393,9 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
       <button class="btn btn-sm" onclick="closeColabsManager()">✕</button>
     </div>
     <div class="modal-body">
-      <div style="display:flex;gap:8px;margin-bottom:16px">
-        <input type="text" id="new-colab-nombre" class="field-input" placeholder="Nombre completo" style="flex:2">
-        <select id="new-colab-cargo" class="field-input" style="flex:1">
-          <option value="Técnico">Técnico</option>
-          <option value="Ayudante">Ayudante</option>
-          <option value="PDR">PDR</option>
-          <option value="Administrador">Administrador</option>
-          <option value="Asistente">Asistente</option>
-          <option value="Otro">Otro</option>
-        </select>
-        <button class="btn btn-primary" onclick="addColab()">+ Agregar</button>
+      <div style="margin-bottom:16px;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+        <span style="font-size:12px;color:var(--muted2)">El personal se gestiona desde Configuración.</span>
+        <a href="configuracion.html" class="btn btn-primary btn-sm" style="text-decoration:none;white-space:nowrap">⚙️ Ir a Configuración</a>
       </div>
       <div id="colabs-manager-list" style="display:flex;flex-direction:column;gap:6px;max-height:400px;overflow-y:auto">
         <div style="text-align:center;color:var(--muted);font-size:12px;padding:16px">Cargando...</div>
@@ -1067,73 +1059,20 @@ function renderColabsManagerList() {
   list.innerHTML = allColabs.map(c => {
     const activo = c.activo !== false;
     const cargoClass = getCargoClass(c.cargo);
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;${!activo ? 'opacity:.5' : ''}">
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface2);border:1.5px solid var(--border);border-radius:8px;${!activo ? 'opacity:.4' : ''}">
       <div class="colab-avatar" style="background:${avatarColor(c.nombre)};width:30px;height:30px;font-size:11px">${c.nombre.split(' ').map(x=>x[0]).join('').substring(0,2).toUpperCase()}</div>
       <div style="flex:1;min-width:0">
         <div style="font-size:13px;font-weight:600;color:var(--accent)">${escHtml(c.nombre)}</div>
         <div style="font-size:10px;color:var(--muted2)">${escHtml(c.cargo || '—')}</div>
       </div>
       <span class="badge ${cargoClass}" style="font-size:9px">${escHtml(c.cargo || '—')}</span>
-      <button onclick="toggleColabActivo('${c.id}', ${activo})" class="btn btn-sm" style="font-size:10px;padding:4px 8px;${activo ? '' : 'background:var(--green-bg);color:var(--green);border-color:var(--green-border)'}">${activo ? '⏸ Desactivar' : '▶ Activar'}</button>
-      <button onclick="deleteColab('${c.id}', '${escHtml(c.nombre)}')" class="btn btn-sm btn-danger" style="font-size:10px;padding:4px 8px">✕</button>
+      <span style="font-size:10px;font-weight:600;color:${activo ? 'var(--green)' : 'var(--muted)'}">${activo ? '✓ Activo' : '○ Inactivo'}</span>
     </div>`;
   }).join('');
 }
 
-async function addColab() {
-  const nombre = document.getElementById('new-colab-nombre').value.trim();
-  const cargo = document.getElementById('new-colab-cargo').value;
-  if (!nombre) { toast('Ingresa el nombre del colaborador', 'err'); return; }
-  if (allColabs.find(c => c.nombre.toLowerCase() === nombre.toLowerCase())) {
-    toast('Ya existe un colaborador con ese nombre', 'err'); return;
-  }
-  const loading = document.getElementById('loading');
-  loading.classList.add('show');
-  try {
-    const ref = window.__db.collection('colaboradores').doc();
-    const data = { id: ref.id, nombre, cargo, activo: true, creadoEn: new Date().toISOString(), creadoPor: maUser?.email || '' };
-    await ref.set(data);
-    allColabs.push(data);
-    allColabs.sort((a, b) => a.nombre.localeCompare(b.nombre));
-    document.getElementById('new-colab-nombre').value = '';
-    renderColabsManagerList();
-    renderColabsGrid(document.getElementById('search-colab').value);
-    populateHistColab();
-    toast('✓ Colaborador agregado', 'ok');
-  } catch(e) { toast('Error: ' + e.message, 'err'); }
-  loading.classList.remove('show');
-}
 
-async function toggleColabActivo(id, activo) {
-  const loading = document.getElementById('loading');
-  loading.classList.add('show');
-  try {
-    await window.__db.collection('colaboradores').doc(id).update({ activo: !activo });
-    const c = allColabs.find(c => c.id === id);
-    if (c) c.activo = !activo;
-    renderColabsManagerList();
-    renderColabsGrid(document.getElementById('search-colab').value);
-    renderTodayTable();
-    toast(activo ? 'Colaborador desactivado' : '✓ Colaborador activado', 'ok');
-  } catch(e) { toast('Error: ' + e.message, 'err'); }
-  loading.classList.remove('show');
-}
 
-async function deleteColab(id, nombre) {
-  if (!confirm(`¿Eliminar a ${nombre}? Los registros históricos se conservarán.`)) return;
-  const loading = document.getElementById('loading');
-  loading.classList.add('show');
-  try {
-    await window.__db.collection('colaboradores').doc(id).delete();
-    allColabs = allColabs.filter(c => c.id !== id);
-    renderColabsManagerList();
-    renderColabsGrid(document.getElementById('search-colab').value);
-    renderTodayTable();
-    populateHistColab();
-    toast('Colaborador eliminado', 'ok');
-  } catch(e) { toast('Error: ' + e.message, 'err'); }
-  loading.classList.remove('show');
-}
 
 // ── GESTIÓN DE ACCESOS ────────────────────────────────────────────────────────
 let accessUsers = [];

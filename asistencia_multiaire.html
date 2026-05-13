@@ -1077,7 +1077,7 @@ function renderColabsManagerList() {
 // ── GESTIÓN DE ACCESOS ────────────────────────────────────────────────────────
 let accessUsers = [];
 function openAccessPanel() {
-  if (!maUser || maUser.rol !== 'ADMIN') { alert('Solo administradores'); return; }
+  if (!maUser || !['ADMIN','SUPER_ADMIN'].includes(maUser.rol)) { alert('Solo administradores'); return; }
   document.getElementById('access-overlay').style.display = 'flex';
   loadAccessUsers();
   const menu = document.getElementById('user-menu');

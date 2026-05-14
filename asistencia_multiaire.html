@@ -134,8 +134,8 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
 .es-colab-header{padding:12px 16px;background:var(--blue);color:#fff;display:flex;align-items:center;justify-content:space-between}
 .es-colab-name{font-size:14px;font-weight:700}
 .es-colab-cargo{font-size:11px;opacity:.75}
-.es-table-head{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr 1.5fr;padding:8px 16px;background:var(--surface3);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)}
-.es-table-row{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr 1.5fr;padding:9px 16px;border-bottom:1px solid var(--border);align-items:center;font-size:12px;transition:background .12s;cursor:pointer}
+.es-table-head{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr;padding:8px 16px;background:var(--surface3);border-bottom:1px solid var(--border);font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--muted2)}
+.es-table-row{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr;padding:9px 16px;border-bottom:1px solid var(--border);align-items:center;font-size:12px;transition:background .12s;cursor:pointer}
 .es-table-row:hover{background:var(--surface2)}
 .es-table-row:last-child{border-bottom:none}
 .es-total-row{display:flex;justify-content:flex-end;padding:10px 16px;background:var(--surface2);border-top:2px solid var(--border);font-size:12px;font-weight:700;gap:12px}
@@ -1143,7 +1143,7 @@ async function loadVistaES() {
       let totalHE=0;
       html+=`<div class="es-colab-block">`;
       html+=`<div class="es-colab-header"><div><div class="es-colab-name">${escHtml(c.nombre)}</div><div class="es-colab-cargo">${escHtml(c.cargo)}</div></div><div style="font-size:11px;opacity:.75">${desde} → ${hasta}</div></div>`;
-      html+=`<div class="es-table-head"><div>Fecha</div><div>Día</div><div>Estado</div><div>Entrada</div><div>Salida</div><div>H. Extra</div><div>Comentario</div></div>`;
+      html+=`<div class="es-table-head"><div>Fecha</div><div>Día</div><div>Estado</div><div>Entrada</div><div>Salida</div><div>H. Extra</div></div>`;
       fechas.forEach(f=>{
         const isDom=new Date(f+'T12:00:00').getDay()===0;
         const isFer=isFeriado(f);
@@ -1177,7 +1177,6 @@ async function loadVistaES() {
           <div style="font-family:var(--mono);font-size:12px">${entStr}</div>
           <div style="font-family:var(--mono);font-size:12px">${salStr}</div>
           <div style="font-family:var(--mono);font-size:12px;${heColor}">${heStr}${manualBadge}</div>
-          <div style="font-size:11px;color:var(--muted2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${escHtml(reg?.observacion||'')}</div>
         </div>`;
       });
       const totalColor=totalHE<0?'var(--red)':totalHE>0?'var(--orange)':'var(--muted)';
@@ -1249,7 +1248,7 @@ function exportESPDF() {
   if(!content||content.includes('empty-state')){toast('Genera la vista primero','err');return;}
   const w=window.open('','_blank');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Vista E/S</title>
-  <style>body{font-family:Arial,sans-serif;font-size:11px;color:#1a2540}.es-colab-block{margin-bottom:24px;border:1px solid #d0daf0;border-radius:8px;overflow:hidden;page-break-inside:avoid}.es-colab-header{background:#1B3F8B;color:#fff;padding:10px 14px;display:flex;justify-content:space-between}.es-colab-name{font-size:13px;font-weight:700}.es-colab-cargo{font-size:10px;opacity:.75}.es-table-head{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr 1.5fr;padding:7px 14px;background:#e8eef8;font-size:9px;font-weight:700;text-transform:uppercase;color:#6a7a9a}.es-table-row{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr 1.5fr;padding:7px 14px;border-bottom:1px solid #e8eef8;font-size:11px}.es-total-row{display:flex;justify-content:flex-end;padding:8px 14px;background:#f5f8ff;border-top:2px solid #d0daf0;font-weight:700;gap:10px}.badge{display:inline-flex;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700}.badge-ausente{background:#fdf0f2;color:#d63344}.badge-fuera{background:#e8eef8;color:#1B3F8B}.he-manual-badge{font-size:8px;background:#fff3eb;color:#d4621a;border:1px solid #f0c09a;border-radius:3px;padding:1px 4px;margin-left:2px}</style>
+  <style>body{font-family:Arial,sans-serif;font-size:11px;color:#1a2540}.es-colab-block{margin-bottom:24px;border:1px solid #d0daf0;border-radius:8px;overflow:hidden;page-break-inside:avoid}.es-colab-header{background:#1B3F8B;color:#fff;padding:10px 14px;display:flex;justify-content:space-between}.es-colab-name{font-size:13px;font-weight:700}.es-colab-cargo{font-size:10px;opacity:.75}.es-table-head{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr;padding:7px 14px;background:#e8eef8;font-size:9px;font-weight:700;text-transform:uppercase;color:#6a7a9a}.es-table-row{display:grid;grid-template-columns:.8fr .7fr .6fr 1fr 1fr 1fr;padding:7px 14px;border-bottom:1px solid #e8eef8;font-size:11px}.es-total-row{display:flex;justify-content:flex-end;padding:8px 14px;background:#f5f8ff;border-top:2px solid #d0daf0;font-weight:700;gap:10px}.badge{display:inline-flex;padding:2px 7px;border-radius:10px;font-size:9px;font-weight:700}.badge-ausente{background:#fdf0f2;color:#d63344}.badge-fuera{background:#e8eef8;color:#1B3F8B}.he-manual-badge{font-size:8px;background:#fff3eb;color:#d4621a;border:1px solid #f0c09a;border-radius:3px;padding:1px 4px;margin-left:2px}</style>
   </head><body>${content}<script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script></body></html>`);
   w.document.close();
 }

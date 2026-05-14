@@ -1534,7 +1534,8 @@ async function exportAusenciasPDF() {
         <td style="${base}">${dias.map(a=>`<span style="${chip}">${DIAS_C[new Date(a.fecha+'T12:00:00').getDay()]} ${fmtF(a.fecha)}</span>`).join('')}</td>
       </tr>`;
     });
-    var thead=`<tr><th style="${hdr}">Colaborador</th><th style="${hdr}">Cargo</th><th style="${hdr}">Días</th><th style="${hdr}">Fechas sin registro</th></tr>`;
+    var thead=`<colgroup><col style="width:22%"><col style="width:13%"><col style="width:8%"><col style="width:57%"></colgroup>
+      <tr><th style="${hdr}">Colaborador</th><th style="${hdr}">Cargo</th><th style="${hdr}">Días</th><th style="${hdr}">Fechas sin registro</th></tr>`;
   } else {
     diasLab.forEach(f=>{
       const falta=ausencias.filter(a=>a.fecha===f);
@@ -1547,7 +1548,8 @@ async function exportAusenciasPDF() {
         <td style="${base}">${falta.map(a=>`<span style="${chip}">${escHtml(a.nombre)}</span>`).join('')}</td>
       </tr>`;
     });
-    var thead=`<tr><th style="${hdr}">Fecha</th><th style="${hdr}">Día</th><th style="${hdr}">Sin registro</th><th style="${hdr}">Colaboradores</th></tr>`;
+    var thead=`<colgroup><col style="width:12%"><col style="width:8%"><col style="width:10%"><col style="width:70%"></colgroup>
+      <tr><th style="${hdr}">Fecha</th><th style="${hdr}">Día</th><th style="${hdr}">Sin reg.</th><th style="${hdr}">Colaboradores</th></tr>`;
   }
 
   const totalDias=ausencias.length;
@@ -1564,7 +1566,8 @@ async function exportAusenciasPDF() {
     .stat{border:1px solid #d0daf0;border-radius:6px;padding:6px 12px;text-align:center;min-width:60px}
     .stat-num{font-size:18px;font-weight:700}
     .stat-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.08em;color:#666}
-    table{border-collapse:collapse;width:100%}
+    table{border-collapse:collapse;width:100%;table-layout:fixed}
+    td,th{word-break:break-word}
   </style></head><body>
   <h3>Reporte de Ausencias</h3>
   <div class="sub">Agrupado por ${grupo==='colab'?'colaborador':'fecha'} · ${desde} → ${hasta}</div>

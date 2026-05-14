@@ -654,7 +654,8 @@ async function init() {
 // ── UTILS ─────────────────────────────────────────────────────────────────────
 function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 function toast(msg,type){const el=document.getElementById('toast');el.textContent=msg;el.className='toast show '+(type||'');setTimeout(()=>el.classList.remove('show'),3200);}
-function todayKey(){return new Date().toISOString().slice(0,10);}
+function localDateKey(d){const _d=d||new Date();return`${_d.getFullYear()}-${String(_d.getMonth()+1).padStart(2,'0')}-${String(_d.getDate()).padStart(2,'0')}`;}
+function todayKey(){return localDateKey();}
 function updateHoyDate(){document.getElementById('hoy-date').textContent=new Date().toLocaleDateString('es-PE',{weekday:'long',day:'numeric',month:'long',year:'numeric'});}
 
 function populateHoraSelects() {
@@ -682,8 +683,8 @@ function setDefaultRanges() {
   // Período 25 del mes anterior → 24 del mes actual
   const hasta=new Date(today.getFullYear(),today.getMonth(),24);
   const desde=new Date(today.getFullYear(),today.getMonth()-1,25);
-  const d=desde.toISOString().slice(0,10),h=hasta.toISOString().slice(0,10);
-  const t=todayKey(),w=new Date(Date.now()-7*86400000).toISOString().slice(0,10);
+  const d=localDateKey(desde),h=localDateKey(hasta);
+  const t=todayKey(),w=localDateKey(new Date(Date.now()-7*86400000));
   ['hist-desde','ta-desde','es-desde','res-desde'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=d;});
   ['hist-hasta','ta-hasta','es-hasta','res-hasta'].forEach(id=>{const el=document.getElementById(id);if(el)el.value=h;});
   document.getElementById('hist-desde').value=w;
@@ -753,7 +754,7 @@ function renderFeriados() {
     '07-28':'Fiestas Patrias','07-29':'Fiestas Patrias','08-30':'Santa Rosa de Lima',
     '10-08':'Combate de Angamos','11-01':'Todos los Santos','12-08':'Inmaculada Concepción','12-25':'Navidad'
   };
-  const today=new Date().toISOString().slice(0,10);
+  const today=todayKey();
   const currentYear=new Date().getFullYear().toString();
   const byYear={};
   feriados.forEach(f=>{const y=f.split('-')[0];if(!byYear[y])byYear[y]=[];byYear[y].push(f);});

@@ -1126,6 +1126,22 @@ async function confirmImport() {
 
 
 // ── MAESTROS ──────────────────────────────────────────────────────────────────
+const FERIADOS_CONFIG_DEFAULT = [
+  {nombre:'Año Nuevo',             fecha:'2026-01-01'},
+  {nombre:'Jueves Santo',          fecha:'2026-04-02'},
+  {nombre:'Viernes Santo',         fecha:'2026-04-03'},
+  {nombre:'Día del Trabajo',       fecha:'2026-05-01'},
+  {nombre:'Batalla de Arica',      fecha:'2026-06-07'},
+  {nombre:'San Pedro y San Pablo', fecha:'2026-06-29'},
+  {nombre:'Fiestas Patrias',       fecha:'2026-07-28'},
+  {nombre:'Fiestas Patrias',       fecha:'2026-07-29'},
+  {nombre:'Santa Rosa de Lima',    fecha:'2026-08-30'},
+  {nombre:'Combate de Angamos',    fecha:'2026-10-08'},
+  {nombre:'Todos los Santos',      fecha:'2026-11-01'},
+  {nombre:'Inmaculada Concepción', fecha:'2026-12-08'},
+  {nombre:'Navidad',               fecha:'2026-12-25'},
+];
+
 let maestrosData = { personal: [], tiendas: [], grupos: [], feriados: [] };
 let maestrosChanged = false;
 
@@ -1169,6 +1185,15 @@ async function loadMaestros() {
       fecha: String(f.fecha || '').trim(),
       activo: String(f.activo || 'SI').trim().toUpperCase() === 'NO' ? 'NO' : 'SI'
     })).filter(f => f.nombre && f.fecha).sort((a, b) => a.fecha.localeCompare(b.fecha));
+    // Pre-cargar feriados del año actual si Firestore no los tiene
+    const _cy = new Date().getFullYear().toString();
+    if (!maestrosData.feriados.some(f => f.fecha.startsWith(_cy))) {
+      const _defs = FERIADOS_CONFIG_DEFAULT
+        .filter(f => f.fecha.startsWith(_cy))
+        .map((f, i) => ({ id: 'FER' + String(Date.now() + i).slice(-6), nombre: f.nombre, fecha: f.fecha, activo: 'SI' }));
+      maestrosData.feriados = [...maestrosData.feriados, ..._defs].sort((a, b) => a.fecha.localeCompare(b.fecha));
+      maestrosChanged = true;
+    }
     renderPersonal();
     renderTiendas();
     renderGrupos();

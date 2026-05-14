@@ -758,7 +758,7 @@ function renderFeriados() {
   const byYear={};
   feriados.forEach(f=>{const y=f.split('-')[0];if(!byYear[y])byYear[y]=[];byYear[y].push(f);});
   let html='';
-  Object.keys(byYear).sort().forEach((year,idx)=>{
+  Object.keys(byYear).sort((a,b)=>b-a).forEach((year,idx)=>{
     const isCY=year===currentYear;
     html+=`<div style="font-size:11px;font-weight:700;color:var(--muted2);text-transform:uppercase;letter-spacing:.08em;padding:10px 0 6px;${idx>0?'margin-top:10px;border-top:1px solid var(--border)':''}">
       ${year}${isCY?' <span style="color:var(--blue)">— año actual</span>':''}

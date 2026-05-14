@@ -396,6 +396,7 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
           </select>
         </div>
         <button class="btn btn-primary" onclick="loadAusencias()" style="margin-left:auto;padding:7px 18px;font-size:13px">⚠ Generar reporte</button>
+        <button class="btn" onclick="exportAusenciasPDF()" style="padding:7px 14px;font-size:13px">⬇ PDF</button>
       </div>
       <div id="aus-summary" style="display:none;margin-bottom:16px"></div>
       <div id="aus-body"></div>
@@ -1491,10 +1492,100 @@ async function exportESExcel() {
 
 // ── TABS ──────────────────────────────────────────────────────────────────────
 // ── AUSENCIAS ─────────────────────────────────────────────────────────────────
-async function loadAusencias() {
+async function ausenciasData() {
   const desde=document.getElementById('aus-desde').value;
   const hasta=document.getElementById('aus-hasta').value;
   const grupo=document.getElementById('aus-grupo').value;
+  if(!desde||!hasta)return null;
+  const hoy=todayKey();
+  const diasLab=[];
+  let cur=new Date(desde+'T12:00:00'),end=new Date(Math.min(new Date(hasta+'T12:00:00'),new Date(hoy+'T12:00:00')));
+  while(cur<=end){const f=cur.toISOString().slice(0,10);if(!esDiaNoLaboral(f))diasLab.push(f);cur=new Date(cur.getTime()+86400000);}
+  const snap=await window.__db.collection('asistencia_registros').get();
+  const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+  const colabs=allColabs.filter(c=>c.activo);
+  const ausencias=[];
+  colabs.forEach(c=>diasLab.forEach(f=>{if(!regs.some(r=>r.colabId===c.id&&r.fecha===f))ausencias.push({colabId:c.id,nombre:c.nombre,cargo:c.cargo||'',fecha:f});}));
+  return{desde,hasta,grupo,diasLab,colabs,ausencias};
+}
+
+async function exportAusenciasPDF() {
+  const d=await ausenciasData();
+  if(!d){toast('Selecciona el rango de fechas primero','err');return;}
+  const{desde,hasta,grupo,diasLab,colabs,ausencias}=d;
+  if(!ausencias.length){toast('Sin ausencias en el período','err');return;}
+
+  const DIAS_C=['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+  function fmtF(f){const[,m,dd]=f.split('-');return`${dd}/${m}`;}
+  const base='border:1px solid #d0daf0;padding:4px 8px;font-size:9px;';
+  const hdr='background:#1B3F8B;color:#fff;font-weight:bold;font-size:9px;border:1px solid #0f2860;padding:5px 8px;';
+  const chip='display:inline-block;background:#f0f4fa;border:1px solid #c0d0ef;border-radius:4px;padding:2px 7px;font-size:8px;margin:2px 3px 2px 0;font-family:monospace;';
+  const red='background:#fdf0f2;color:#c02030;font-weight:700;border-radius:20px;padding:2px 9px;font-size:8px;';
+
+  let tbody='';
+  if(grupo==='colab'){
+    colabs.forEach(c=>{
+      const dias=ausencias.filter(a=>a.colabId===c.id);
+      if(!dias.length)return;
+      tbody+=`<tr>
+        <td style="${hdr}">${escHtml(c.nombre)}</td>
+        <td style="${base}color:#4a5a7a;">${escHtml(c.cargo)}</td>
+        <td style="${base}text-align:center;"><span style="${red}">${dias.length} día${dias.length>1?'s':''}</span></td>
+        <td style="${base}">${dias.map(a=>`<span style="${chip}">${DIAS_C[new Date(a.fecha+'T12:00:00').getDay()]} ${fmtF(a.fecha)}</span>`).join('')}</td>
+      </tr>`;
+    });
+    var thead=`<tr><th style="${hdr}">Colaborador</th><th style="${hdr}">Cargo</th><th style="${hdr}">Días</th><th style="${hdr}">Fechas sin registro</th></tr>`;
+  } else {
+    diasLab.forEach(f=>{
+      const falta=ausencias.filter(a=>a.fecha===f);
+      if(!falta.length)return;
+      const dow=new Date(f+'T12:00:00').getDay();
+      tbody+=`<tr>
+        <td style="${hdr}font-family:monospace;">${fmtF(f)}</td>
+        <td style="${base}color:#4a5a7a;">${DIAS_C[dow]}</td>
+        <td style="${base}text-align:center;"><span style="${red}">${falta.length}</span></td>
+        <td style="${base}">${falta.map(a=>`<span style="${chip}">${escHtml(a.nombre)}</span>`).join('')}</td>
+      </tr>`;
+    });
+    var thead=`<tr><th style="${hdr}">Fecha</th><th style="${hdr}">Día</th><th style="${hdr}">Sin registro</th><th style="${hdr}">Colaboradores</th></tr>`;
+  }
+
+  const totalDias=ausencias.length;
+  const colabsAfect=new Set(ausencias.map(a=>a.colabId)).size;
+  const fechasAfect=new Set(ausencias.map(a=>a.fecha)).size;
+
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Ausencias</title>
+  <style>
+    @page{size:A4 portrait;margin:10mm}
+    body{font-family:Arial,sans-serif;font-size:9px;color:#1a2540;margin:0}
+    h3{margin:0 0 3px;font-size:13px;color:#1B3F8B}
+    .sub{font-size:9px;color:#666;margin-bottom:10px}
+    .stats{display:flex;gap:10px;margin-bottom:12px}
+    .stat{border:1px solid #d0daf0;border-radius:6px;padding:6px 12px;text-align:center;min-width:60px}
+    .stat-num{font-size:18px;font-weight:700}
+    .stat-lbl{font-size:7px;text-transform:uppercase;letter-spacing:.08em;color:#666}
+    table{border-collapse:collapse;width:100%}
+  </style></head><body>
+  <h3>Reporte de Ausencias</h3>
+  <div class="sub">Agrupado por ${grupo==='colab'?'colaborador':'fecha'} · ${desde} → ${hasta}</div>
+  <div class="stats">
+    <div class="stat"><div class="stat-num" style="color:#c02030">${totalDias}</div><div class="stat-lbl">Registros faltantes</div></div>
+    <div class="stat"><div class="stat-num" style="color:#F47920">${colabsAfect}</div><div class="stat-lbl">Colaboradores</div></div>
+    <div class="stat"><div class="stat-num" style="color:#1B3F8B">${fechasAfect}</div><div class="stat-lbl">Fechas afectadas</div></div>
+    <div class="stat"><div class="stat-num" style="color:#1a2540">${diasLab.length}</div><div class="stat-lbl">Días laborables</div></div>
+  </div>
+  <table>${thead}<tbody>${tbody}</tbody></table>
+  <script>window.onload=()=>setTimeout(()=>window.print(),400)<\/script>
+  </body></html>`;
+
+  const w=window.open('','_blank');
+  w.document.write(html);
+  w.document.close();
+}
+
+async function loadAusencias() {
+  const desde=document.getElementById('aus-desde').value;
+  const hasta=document.getElementById('aus-hasta').value;
   if(!desde||!hasta){toast('Selecciona el rango de fechas','err');return;}
   if(desde>hasta){toast('La fecha inicial debe ser menor o igual a la final','err');return;}
 
@@ -1503,31 +1594,9 @@ async function loadAusencias() {
   body.innerHTML='<div class="empty-state"><div class="spin" style="margin:0 auto 8px"></div><div class="empty-text">Calculando ausencias...</div></div>';
   summary.style.display='none';
 
-  const hoy=todayKey();
-  // Solo días laborables pasados dentro del rango
-  const diasLab=[];
-  let cur=new Date(desde+'T12:00:00'),end=new Date(Math.min(new Date(hasta+'T12:00:00'),new Date(hoy+'T12:00:00')));
-  while(cur<=end){
-    const f=cur.toISOString().slice(0,10);
-    if(!esDiaNoLaboral(f))diasLab.push(f);
-    cur=new Date(cur.getTime()+86400000);
-  }
+  const{grupo,diasLab,colabs,ausencias}=await ausenciasData();
+
   if(!diasLab.length){body.innerHTML='<div class="empty-state"><div class="empty-icon">📅</div><div class="empty-text">No hay días laborables pasados en ese rango</div></div>';return;}
-
-  const snap=await window.__db.collection('asistencia_registros').get();
-  const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
-  const colabs=allColabs.filter(c=>c.activo);
-
-  // Calcular ausencias: día laborable sin registro (cualquier estado cuenta como presente)
-  // Estructura: [{colabId, nombre, cargo, fecha}]
-  const ausencias=[];
-  colabs.forEach(c=>{
-    diasLab.forEach(f=>{
-      if(!regs.some(r=>r.colabId===c.id&&r.fecha===f)){
-        ausencias.push({colabId:c.id,nombre:c.nombre,cargo:c.cargo||'',fecha:f});
-      }
-    });
-  });
 
   const totalDias=ausencias.length;
   const colabsAfectados=new Set(ausencias.map(a=>a.colabId)).size;

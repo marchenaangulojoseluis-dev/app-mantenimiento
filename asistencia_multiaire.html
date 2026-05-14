@@ -721,8 +721,9 @@ function getCargoClass(cargo){
 function formatFecha(iso){if(!iso)return'—';const[y,m,d]=iso.split('-');const f=new Date(iso+'T12:00:00');return`${DIAS_CORTO[f.getDay()]} ${d}/${m}`;}
 
 function getHeValue(reg) {
-  // Manual siempre prevalece
   if(reg.heManual===true&&reg.horasExtra!==null&&reg.horasExtra!==undefined)return{val:reg.horasExtra,manual:true};
+  // Falta injustificada = jornada completa no trabajada
+  if(reg.estado==='F')return{val:-8,manual:false};
   const auto=calcHorasExtra(reg.horaEntrada,reg.horaSalida,reg.fecha);
   return{val:auto,manual:false};
 }

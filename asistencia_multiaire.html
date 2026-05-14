@@ -698,11 +698,12 @@ function calcHorasExtra(entrada,salida,fecha) {
   if(entrada===null||salida===null||entrada===undefined||salida===undefined)return null;
   const total=salida-entrada;
   if(total<=0)return null;
-  const d=new Date((fecha||todayKey())+'T12:00:00');
-  const esSabado=d.getDay()===6;
-  const base=esSabado?4.5:9.5;
-  const extra=total-base;
-  return Math.round(extra*100)/100;
+  const f=fecha||todayKey();
+  const d=new Date(f+'T12:00:00');
+  const dow=d.getDay();
+  // Domingo o feriado: todo lo trabajado es hora extra (base=0)
+  const base=dow===0||isFeriado(f)?0:dow===6?4.5:9.5;
+  return Math.round((total-base)*100)/100;
 }
 
 function isFeriado(fecha){return feriados.includes(fecha);}

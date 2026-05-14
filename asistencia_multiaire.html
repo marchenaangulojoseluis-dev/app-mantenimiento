@@ -839,7 +839,7 @@ async function loadTodayData() {
   const snap=await window.__db.collection('asistencia_registros').get();
   todayRegs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha===fecha);
   renderTodayTable();
-  renderColabsGrid(document.getElementById('search-colab').value);
+  renderColabsGrid();
 }
 
 async function loadRegsByFecha(fecha) {
@@ -918,7 +918,7 @@ async function registrar(tipo) {
     }
     document.getElementById('reg-obs').value='';
     if(fecha===todayKey())await loadTodayData();
-    else renderColabsGrid(document.getElementById('search-colab').value);
+    else renderColabsGrid();
   } catch(e){toast('Error: '+e.message,'err');}
   loading.classList.remove('show');
 }

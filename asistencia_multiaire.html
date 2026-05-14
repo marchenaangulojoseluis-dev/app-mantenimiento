@@ -1154,32 +1154,42 @@ async function loadVistaES() {
       html+=`<div class="es-colab-header"><div><div class="es-colab-name">${escHtml(c.nombre)}</div><div class="es-colab-cargo">${escHtml(c.cargo)}</div></div><div style="font-size:11px;opacity:.75">${desde} → ${hasta}</div></div>`;
       html+=`<div class="es-table-head"><div>Fecha</div><div>Día</div><div>Estado</div><div>Entrada</div><div>Salida</div><div>H. Extra</div></div>`;
       fechas.forEach(f=>{
-        const isDom=new Date(f+'T12:00:00').getDay()===0;
-        const isFer=isFeriado(f);
-        if(isDom||isFer)return; // No incluir domingos ni feriados
+        const dow=new Date(f+'T12:00:00').getDay();
+        const noLab=dow===0||isFeriado(f);
         const reg=cRegs.find(r=>r.fecha===f);
-        const d=new Date(f+'T12:00:00');
-        const diaStr=DIAS_CORTO[d.getDay()];
-        const[y,m,dd]=f.split('-');
+        const diaStr=DIAS_CORTO[dow];
+        const[,m,dd]=f.split('-');
         const fechaStr=`${dd}/${m}`;
+
+        // Día no laboral sin registro: fila naranja decorativa, sin penalización
+        if(noLab&&!reg){
+          html+=`<div class="es-table-row" style="background:#FEF3E2;cursor:default">
+            <div style="font-family:var(--mono);font-size:11px;color:#8a5a00">${fechaStr}</div>
+            <div style="font-size:11px;color:#8a5a00">${diaStr}</div>
+            <div><span style="font-size:10px;color:#8a5a00;font-weight:600">${dow===0?'Domingo':'Feriado'}</span></div>
+            <div></div><div></div><div></div>
+          </div>`;
+          return;
+        }
+
+        const rowBg=noLab?'background:#FEF3E2;':'';
+        const regIdParam=reg?`'${reg.id}'`:'null';
         let entStr='—',salStr='—',heStr='—',estadoStr='—',heManual=false,heVal=null;
         if(reg){
           entStr=reg.horaEntrada!=null?decimalToHora(reg.horaEntrada):'—';
           salStr=reg.horaSalida!=null?decimalToHora(reg.horaSalida):'—';
           const he=getHeValue(reg);
-          heVal=he.val;
-          heManual=he.manual;
+          heVal=he.val;heManual=he.manual;
           heStr=he.val!=null?he.val.toFixed(1):'—';
           estadoStr=reg.estado||'A';
           if(heVal!=null)totalHE+=heVal;
         } else if(f<=todayKey()){
-          estadoStr='X';
-          heVal=-8;heStr='-8.0';totalHE+=-8;
+          // Solo días laborables sin registro → X / -8
+          estadoStr='X';heVal=-8;heStr='-8.0';totalHE+=-8;
         }
         const heColor=heVal==null?'':heVal<0?'color:var(--red);font-weight:700':heVal>0?'color:var(--orange);font-weight:700':'';
         const manualBadge=heManual?'<span class="he-manual-badge">M</span>':'';
-        const regIdParam=reg?`'${reg.id}'`:'null';
-        html+=`<div class="es-table-row" onclick="openEditReg(${regIdParam},'${c.id}','${escHtml(c.nombre)}','${escHtml(c.cargo)}','${f}')">
+        html+=`<div class="es-table-row" style="${rowBg}" onclick="openEditReg(${regIdParam},'${c.id}','${escHtml(c.nombre)}','${escHtml(c.cargo)}','${f}')">
           <div style="font-family:var(--mono);font-size:11px">${fechaStr}</div>
           <div style="font-size:11px;color:var(--muted2)">${diaStr}</div>
           <div><span class="badge ${estadoStr==='X'||estadoStr==='F'?'badge-ausente':estadoStr==='A'||estadoStr==='DM'||estadoStr==='P'?'badge-fuera':''}">${estadoStr}</span></div>

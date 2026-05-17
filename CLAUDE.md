@@ -162,3 +162,5 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-16 | .gitignore actualizado: excluye _chat.txt y settings.local.json |
 | 2026-05-17 | Optimización queries Firestore: todas las consultas usan .where('fecha') en lugar de traer colección completa |
 | 2026-05-17 | Corrige doble conteo de Faltas en Resumen H.E.: cRegs solo procesa días trabajados, diasRango maneja todas las ausencias |
+| 2026-05-17 | Corrige deleteReg: captura fecha antes de closeEditReg para evitar leer editRegData=null |
+| 2026-05-17 | Elimina variable dom duplicada en Vista T/A (condición f==='dom' nunca verdadera) |

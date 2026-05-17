@@ -190,6 +190,8 @@ header{background:var(--blue);padding:0 24px;height:52px;display:flex;align-item
   .colabs-grid{grid-template-columns:1fr}
   .stats-row{grid-template-columns:1fr 1fr}
   .table-head,.table-row{grid-template-columns:2fr 1fr 1fr 1fr}
+  .table-head>div:nth-child(2),.table-row>div:nth-child(2),
+  .table-head>div:nth-child(7),.table-row>div:nth-child(7){display:none}
 }
 ::-webkit-scrollbar{width:4px;height:4px}
 ::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
@@ -956,6 +958,7 @@ async function registrarEstado(estado) {
   const fecha=document.getElementById('sidebar-fecha').value||todayKey();
   if(fecha>todayKey()){toast('No se puede registrar en fechas futuras','err');return;}
   const labels={DM:'Descanso médico',P:'Permiso',F:'Falta'};
+  if(!confirm(`¿Registrar "${labels[estado]}" para ${colab.nombre} el ${fecha}?`))return;
   const loading=document.getElementById('loading');
   loading.classList.add('show');
   try {

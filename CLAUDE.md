@@ -160,3 +160,5 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-16 | Limpieza de dominios Firebase — eliminados tunnels de Cloudflare |
 | 2026-05-16 | SSO protection de Vercel deshabilitada — URLs públicas sin login |
 | 2026-05-16 | .gitignore actualizado: excluye _chat.txt y settings.local.json |
+| 2026-05-17 | Optimización queries Firestore: todas las consultas usan .where('fecha') en lugar de traer colección completa |
+| 2026-05-17 | Corrige doble conteo de Faltas en Resumen H.E.: cRegs solo procesa días trabajados, diasRango maneja todas las ausencias |

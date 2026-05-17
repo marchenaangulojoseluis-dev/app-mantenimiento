@@ -1112,9 +1112,8 @@ async function loadVistaTA() {
     activos.forEach(c=>{
       html+=`<tr><td class="nombre-col">${escHtml(c.nombre)}<div style="font-size:9px;color:var(--muted2)">${escHtml(c.cargo)}</div></td>`;
       fechas.forEach(f=>{
-        const dom=f==='dom'||new Date(f+'T12:00:00').getDay()===0;
-        const fer=isFeriado(f);
         const isDom=new Date(f+'T12:00:00').getDay()===0;
+        const fer=isFeriado(f);
         if(isDom){html+=`<td class="ta-cell-DOM">—</td>`;return;}
         if(fer){html+=`<td class="ta-cell-FER">FER</td>`;return;}
         const reg=regs.find(r=>r.colabId===c.id&&r.fecha===f);

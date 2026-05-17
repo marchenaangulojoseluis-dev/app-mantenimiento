@@ -862,15 +862,15 @@ function onSidebarFechaChange() {
 // ── REGISTROS ────────────────────────────────────────────────────────────────
 async function loadTodayData() {
   const fecha=todayKey();
-  const snap=await window.__db.collection('asistencia_registros').get();
-  todayRegs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha===fecha);
+  const snap=await window.__db.collection('asistencia_registros').where('fecha','==',fecha).get();
+  todayRegs=snap.docs.map(d=>({id:d.id,...d.data()}));
   renderTodayTable();
   renderColabsGrid();
 }
 
 async function loadRegsByFecha(fecha) {
-  const snap=await window.__db.collection('asistencia_registros').get();
-  return snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha===fecha);
+  const snap=await window.__db.collection('asistencia_registros').where('fecha','==',fecha).get();
+  return snap.docs.map(d=>({id:d.id,...d.data()}));
 }
 
 function renderTodayTable() {
@@ -1055,8 +1055,8 @@ async function loadHistorial() {
   const body=document.getElementById('hist-table-body');
   body.innerHTML='<div class="empty-state"><div class="spin" style="margin:0 auto"></div></div>';
   try {
-    const snap=await window.__db.collection('asistencia_registros').get();
-    let regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+    const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+    let regs=snap.docs.map(d=>({id:d.id,...d.data()}));
     if(colabId)regs=regs.filter(r=>r.colabId===colabId);
     regs.sort((a,b)=>b.fecha.localeCompare(a.fecha)||(a.nombre||'').localeCompare(b.nombre||''));
     if(!regs.length){body.innerHTML='<div class="empty-state"><div class="empty-icon">📊</div><div class="empty-text">Sin registros en el rango</div></div>';return;}
@@ -1091,8 +1091,8 @@ async function loadVistaTA() {
   const content=document.getElementById('ta-content');
   content.innerHTML='<div class="empty-state"><div class="spin" style="margin:0 auto"></div></div>';
   try {
-    const snap=await window.__db.collection('asistencia_registros').get();
-    const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+    const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+    const regs=snap.docs.map(d=>({id:d.id,...d.data()}));
     // Generar rango de fechas
     const fechas=[];
     let cur=new Date(desde+'T12:00:00');
@@ -1145,8 +1145,8 @@ async function loadVistaES() {
   const content=document.getElementById('es-content');
   content.innerHTML='<div class="empty-state"><div class="spin" style="margin:0 auto"></div></div>';
   try {
-    const snap=await window.__db.collection('asistencia_registros').get();
-    let regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+    const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+    let regs=snap.docs.map(d=>({id:d.id,...d.data()}));
     const colabs=colabFiltro?allColabs.filter(c=>c.id===colabFiltro):allColabs.filter(c=>c.activo);
     // Generar fechas del rango
     const fechas=[];
@@ -1221,8 +1221,8 @@ async function loadResumen() {
   const body=document.getElementById('resumen-body');
   body.innerHTML='<div class="empty-state"><div class="spin" style="margin:0 auto"></div></div>';
   try {
-    const snap=await window.__db.collection('asistencia_registros').get();
-    const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+    const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+    const regs=snap.docs.map(d=>({id:d.id,...d.data()}));
     const activos=allColabs.filter(c=>c.activo);
     let html='';
     // Días laborables del rango (lun–sáb, sin feriados)
@@ -1274,8 +1274,8 @@ async function exportESPDF() {
   const hasta=document.getElementById('es-hasta').value;
   const colabFiltro=document.getElementById('es-colab').value;
   if(!desde||!hasta){toast('Genera la vista primero','err');return;}
-  const snap=await window.__db.collection('asistencia_registros').get();
-  const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+  const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+  const regs=snap.docs.map(d=>({id:d.id,...d.data()}));
   const colabs=colabFiltro?allColabs.filter(c=>c.id===colabFiltro):allColabs.filter(c=>c.activo);
   const hoy=todayKey();
   const fechas=[];
@@ -1387,8 +1387,8 @@ async function exportESExcel() {
   const hasta=document.getElementById('es-hasta').value;
   const colabFiltro=document.getElementById('es-colab').value;
   if(!desde||!hasta){toast('Genera la vista primero','err');return;}
-  const snap=await window.__db.collection('asistencia_registros').get();
-  const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+  const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+  const regs=snap.docs.map(d=>({id:d.id,...d.data()}));
   const colabs=colabFiltro?allColabs.filter(c=>c.id===colabFiltro):allColabs.filter(c=>c.activo);
   const hoy=todayKey();
   const fechas=[];
@@ -1501,8 +1501,8 @@ async function ausenciasData() {
   const diasLab=[];
   let cur=new Date(desde+'T12:00:00'),end=new Date(Math.min(new Date(hasta+'T12:00:00'),new Date(hoy+'T12:00:00')));
   while(cur<=end){const f=cur.toISOString().slice(0,10);if(!esDiaNoLaboral(f))diasLab.push(f);cur=new Date(cur.getTime()+86400000);}
-  const snap=await window.__db.collection('asistencia_registros').get();
-  const regs=snap.docs.map(d=>({id:d.id,...d.data()})).filter(r=>r.fecha>=desde&&r.fecha<=hasta);
+  const snap=await window.__db.collection('asistencia_registros').where('fecha','>=',desde).where('fecha','<=',hasta).get();
+  const regs=snap.docs.map(d=>({id:d.id,...d.data()}));
   const colabs=allColabs.filter(c=>c.activo);
   const ausencias=[];
   colabs.forEach(c=>diasLab.forEach(f=>{if(!regs.some(r=>r.colabId===c.id&&r.fecha===f))ausencias.push({colabId:c.id,nombre:c.nombre,cargo:c.cargo||'',fecha:f});}));

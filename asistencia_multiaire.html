@@ -1034,13 +1034,13 @@ async function deleteReg() {
   const regId=document.getElementById('edit-reg-id').value;
   if(!regId){closeEditReg();return;}
   if(!confirm('¿Eliminar este registro?'))return;
+  const fecha=editRegData?.fecha||todayKey();
   const loading=document.getElementById('loading');
   loading.classList.add('show');
   try {
     await window.__db.collection('asistencia_registros').doc(regId).delete();
     toast('Registro eliminado','ok');
     closeEditReg();
-    const fecha=editRegData?.fecha||todayKey();
     if(fecha===todayKey())await loadTodayData();
   } catch(e){toast('Error: '+e.message,'err');}
   loading.classList.remove('show');

@@ -271,6 +271,8 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
             <div class="backup-file"><span></span>maestros_tiendas.csv</div>
             <div class="backup-file"><span></span>maestros_grupos.csv</div>
             <div class="backup-file"><span></span>maestros_feriados.csv</div>
+            <div class="backup-file"><span></span>bd_itinerarios.csv</div>
+            <div class="backup-file"><span></span>bd_bloques.csv</div>
             <div class="backup-file"><span></span>inventario.csv</div>
             <div class="backup-file"><span></span>mantenimiento.csv</div>
             <div class="backup-file"><span></span>usuarios.csv</div>
@@ -876,12 +878,14 @@ async function exportBackup() {
 
   try {
     // Leer todo directo de Firestore
-    const [asistSnap, persSnap, tienSnap, gruSnap, ferSnap, invSnap, maintSnap, usersSnap, tareasSnap] = await Promise.all([
+    const [asistSnap, persSnap, tienSnap, gruSnap, ferSnap, itiSnap, bloqSnap, invSnap, maintSnap, usersSnap, tareasSnap] = await Promise.all([
       window.__db.collection('asistencia_registros').get(),
       window.__db.collection('maestros_personal').get(),
       window.__db.collection('maestros_tiendas').get(),
       window.__db.collection('maestros_grupos').get(),
       window.__db.collection('maestros_feriados').get(),
+      window.__db.collection('bd_itinerarios').get(),
+      window.__db.collection('bd_bloques').get(),
       window.__db.collection('inventario').get(),
       window.__db.collection('mantenimiento').get(),
       window.__db.collection('usuarios').get(),
@@ -930,7 +934,23 @@ async function exportBackup() {
     });
     zip.file('maestros_feriados.csv', [ferHeaders.join(','), ...ferRows].join('\n'));
 
-    // 6. Inventario CSV
+    // 6. Itinerarios CSV
+    const itiHeaders = ['DOC_ID','ID','VERSION','FECHA','DIA','OBS_GENERALES','ESTADO','TOTAL_BLOQUES','USUARIO','UPDATED_AT'];
+    const itiRows = itiSnap.docs.map(d => {
+      const r = d.data();
+      return [d.id, r.id||'', r.version||'', r.fecha||'', r.dia||'', r.obsGenerales||'', r.estado||'', r.totalBloques||0, r.usuario||'', r.updatedAt||''].map(escapeCSV).join(',');
+    });
+    zip.file('bd_itinerarios.csv', [itiHeaders.join(','), ...itiRows].join('\n'));
+
+    // 7. Bloques CSV
+    const bloqHeaders = ['DOC_ID','ID','ID_ITI','VERSION','N_BLOQUE','FECHA','DIA','ID_TIENDA','TIENDA','CLIENTE','ID_GRUPO','GRUPO','HORA_INICIO','HORA_FIN','DETALLE','PERSONAL','PERSONAL1','PERSONAL2','PERSONAL3','PERSONAL4','ESTADO','USUARIO'];
+    const bloqRows = bloqSnap.docs.map(d => {
+      const r = d.data();
+      return [d.id, r.id||'', r.idIti||'', r.version||'', r.nBloque||'', r.fecha||'', r.dia||'', r.idTienda||'', r.tienda||'', r.cliente||'', r.idGrupo||'', r.grupo||'', r.horaInicio||0, r.horaFin||0, r.detalle||'', JSON.stringify(r.personal||[]), JSON.stringify(r.personal1||{}), JSON.stringify(r.personal2||{}), JSON.stringify(r.personal3||{}), JSON.stringify(r.personal4||{}), r.estado||'', r.usuario||''].map(escapeCSV).join(',');
+    });
+    zip.file('bd_bloques.csv', [bloqHeaders.join(','), ...bloqRows].join('\n'));
+
+    // 8. Inventario CSV
     const invHeaders = ['EQ_ID','SEDE','CLIENTE','TIPO','NOMBRE','AREA','MARCA','MODELO','SERIE'];
     const invRows = invSnap.docs.map(d => {
       const r = d.data();
@@ -1097,7 +1117,13 @@ async function confirmImport() {
     const {writeBatch:_wb,doc:_doc,collection:_col,getDocs:_dg}=window.__fb;
     if(mode==='replace'){const _b=_wb(window.__db);const _ex=await _dg(_col(window.__db,col));_ex.docs.forEach(d=>_b.delete(d.ref));await _b.commit();}
     let b=_wb(window.__db), n=0;
-    for(const r of rows){b.set(_doc(window.__db,col,mapFn(r).id),mapFn(r));n++;if(n%400===0){await b.commit();b=_wb(window.__db);}}
+    for(const r of rows){
+      const data=mapFn(r);
+      const docId=data._docId||data.id;
+      delete data._docId;
+      b.set(_doc(window.__db,col,docId),data);
+      n++;if(n%400===0){await b.commit();b=_wb(window.__db);}
+    }
     if(n%400!==0)await b.commit();
   }
 
@@ -1147,7 +1173,23 @@ async function confirmImport() {
       addLog('✓ Feriados importados (' + rows.length + ' feriados)', 'ok');
     }
 
-    // 6. Inventario
+    // 6. Itinerarios
+    if (pendingImport.files['bd_itinerarios.csv']) {
+      addLog('🗓 Importando itinerarios...', 'info');
+      const rows = parseCSV(pendingImport.files['bd_itinerarios.csv']);
+      await batchWrite('bd_itinerarios', rows, r => ({_docId:r.DOC_ID, id:r.ID, version:+r.VERSION||1, fecha:r.FECHA, dia:r.DIA, obsGenerales:r.OBS_GENERALES, estado:r.ESTADO, totalBloques:+r.TOTAL_BLOQUES||0, usuario:r.USUARIO, updatedAt:r.UPDATED_AT}));
+      addLog('✓ Itinerarios importados (' + rows.length + ' registros)', 'ok');
+    }
+
+    // 7. Bloques
+    if (pendingImport.files['bd_bloques.csv']) {
+      addLog('🧱 Importando bloques...', 'info');
+      const rows = parseCSV(pendingImport.files['bd_bloques.csv']);
+      await batchWrite('bd_bloques', rows, r => ({_docId:r.DOC_ID, id:r.DOC_ID, idIti:r.ID_ITI, version:+r.VERSION||1, nBloque:+r.N_BLOQUE||1, fecha:r.FECHA, dia:r.DIA, idTienda:r.ID_TIENDA, tienda:r.TIENDA, cliente:r.CLIENTE, idGrupo:r.ID_GRUPO, grupo:r.GRUPO, horaInicio:+r.HORA_INICIO||0, horaFin:+r.HORA_FIN||0, detalle:r.DETALLE, personal:JSON.parse(r.PERSONAL||'[]'), personal1:JSON.parse(r.PERSONAL1||'{}'), personal2:JSON.parse(r.PERSONAL2||'{}'), personal3:JSON.parse(r.PERSONAL3||'{}'), personal4:JSON.parse(r.PERSONAL4||'{}'), estado:r.ESTADO, usuario:r.USUARIO}));
+      addLog('✓ Bloques importados (' + rows.length + ' bloques)', 'ok');
+    }
+
+    // 8. Inventario
     if (pendingImport.files['inventario.csv']) {
       addLog('📦 Importando inventario...', 'info');
       const rows = parseCSV(pendingImport.files['inventario.csv']);

@@ -129,7 +129,7 @@ Script Python `importar_asistencia.py`:
 
 ## index.html — lógica por entorno
 
-- **Producción**: cards Insumos y Asistencia en gris, no clickeables, tag "EN DESARROLLO"
+- **Producción**: card Insumos en gris, no clickeable, tag "EN DESARROLLO". Asistencia activa.
 - **Develop / Localhost**: todas las cards activas
 - Versión y entorno se muestran dinámicamente según hostname:
   - Producción → `3.3.0` / `Producción`
@@ -175,3 +175,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-18 | Agrega campo `telefono` al maestro de personal — preparación para chatbot WhatsApp |
 | 2026-05-18 | Fix: faltas en sábado descuentan -4.5h (no -8h) en Resumen HE y exportaciones — función global heAusencia() |
 | 2026-05-18 | Fix: Resumen HE respeta horasExtra guardado en registros individuales — correcciones manuales en faltas prevalecen sobre el cálculo automático |
+| 2026-05-18 | Asistencia habilitada en producción — solo Insumos permanece EN DESARROLLO |

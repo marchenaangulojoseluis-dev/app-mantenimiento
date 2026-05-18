@@ -746,6 +746,7 @@ function calcHorasExtra(entrada,salida,fecha) {
 function isFeriado(fecha){return feriados.includes(fecha);}
 function isDomingo(fecha){return new Date(fecha+'T12:00:00').getDay()===0;}
 function esDiaNoLaboral(fecha){return isDomingo(fecha)||isFeriado(fecha);}
+function heAusencia(fecha){return new Date(fecha+'T12:00:00').getDay()===6?-4.5:-8;}
 
 function avatarColor(nombre){const colors=['#1B3F8B','#F47920','#1a9e5a','#d63344','#d48a00','#6a3d9a','#2a7abf'];let h=0;for(let i=0;i<nombre.length;i++)h=(h*31+nombre.charCodeAt(i))%colors.length;return colors[h];}
 
@@ -1286,7 +1287,7 @@ async function loadResumen() {
       diasRango.forEach(f=>{
         if(f>hoy)return;
         const reg=regs.find(r=>r.colabId===c.id&&r.fecha===f);
-        if(!reg||reg.estado==='F'){heTotal+=-8;}
+        if(!reg||reg.estado==='F'){heTotal+=heAusencia(f);}
       });
       const heColor=heTotal<0?'color:var(--red);font-weight:700':heTotal>0?'color:var(--orange);font-weight:700':'';
       html+=`<div class="resumen-table-row">
@@ -1324,7 +1325,7 @@ async function exportESPDF() {
   let cur=new Date(desde+'T12:00:00'),end=new Date(hasta+'T12:00:00');
   while(cur<=end){fechas.push(cur.toISOString().slice(0,10));cur=new Date(cur.getTime()+86400000);}
 
-  function heNoShow(f){return new Date(f+'T12:00:00').getDay()===6?-4.5:-8;}
+  const heNoShow=heAusencia;
   function fmtFecha(f){const[y,m,d]=f.split('-');return`${d}/${m}/${y}`;}
   function heColor(v){return typeof v==='number'&&v<0?'color:#c02030;font-weight:700':typeof v==='number'&&v>0?'color:#b86000;font-weight:700':'';}
 
@@ -1437,7 +1438,7 @@ async function exportESExcel() {
   let cur=new Date(desde+'T12:00:00'),end=new Date(hasta+'T12:00:00');
   while(cur<=end){fechas.push(cur.toISOString().slice(0,10));cur=new Date(cur.getTime()+86400000);}
 
-  function heNoShow(f){return new Date(f+'T12:00:00').getDay()===6?-4.5:-8;}
+  const heNoShow=heAusencia;
   function celdasColab(c,f){
     const dow=new Date(f+'T12:00:00').getDay();
     const noLab=dow===0||isFeriado(f);

@@ -1047,8 +1047,10 @@ function updateHeAutoInfo() {
 function closeEditReg(){document.getElementById('modal-edit-reg').classList.remove('open');editRegData=null;}
 
 async function saveEditReg() {
+  if(!editRegData)return;
   const{regId,colabId,fecha}=editRegData;
   const colab=allColabs.find(c=>c.id===colabId);
+  if(!colab){toast('Colaborador no encontrado','err');return;}
   const entStr=document.getElementById('edit-reg-entrada').value;
   const salStr=document.getElementById('edit-reg-salida').value;
   const estado=document.getElementById('edit-reg-estado').value;
@@ -1732,6 +1734,7 @@ function refreshCurrentTab() {
   else if(currentTab==='es')return loadVistaES();
   else if(currentTab==='resumen')return loadResumen();
   else if(currentTab==='feriados'){renderFeriados();return Promise.resolve();}
+  else if(currentTab==='ausencias')return loadAusencias();
   return Promise.resolve();
 }
 

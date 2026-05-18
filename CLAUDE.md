@@ -170,3 +170,5 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-17 | Modo SUPERVISOR solo lectura: sidebar oculto, botones Guardar/Eliminar del modal ocultos via CSS (supervisor-mode class), campos del modal deshabilitados |
 | 2026-05-18 | HE automático en modal de edición: se recalcula en tiempo real al cambiar entrada/salida (onchange → updateHeAutoInfo) |
 | 2026-05-18 | Auto-refresca el tab activo al guardar o eliminar registro — Vista E/S, T/A, Historial y Resumen se actualizan sin tener que regenerar |
+| 2026-05-18 | Fix: tab Ausencias ahora se refresca automáticamente al guardar/eliminar registro |
+| 2026-05-18 | Fix: guard defensivo en saveEditReg si editRegData es null o colab no se encuentra |

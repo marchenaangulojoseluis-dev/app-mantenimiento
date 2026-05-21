@@ -939,10 +939,15 @@ function exportWhatsApp() {
   // Build one message per tipo block (WhatsApp-friendly, short messages)
   const messages = [];
 
+  const updLine = currentUpdatedAt
+    ? `_Actualizado: ${new Date(currentUpdatedAt).toLocaleString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',hour12:false})}_\n`
+    : '';
+
   Object.entries(byTipo).sort((a,b)=>a[0].localeCompare(b[0])).forEach(([tipo, equipos]) => {
     let msg = '';
     msg += `*STATUS DE MANTENIMIENTO – ${currentSede}*\n`;
-    msg += `*${currentPeriodo} ${currentAnio}*\n\n`;
+    msg += `*${currentPeriodo} ${currentAnio}*\n`;
+    msg += updLine + '\n';
     msg += `🟢 COMPLETADO\n🟡 INCOMPLETO\n🔴 NO REALIZADO\n\n`;
     msg += `*${tipo}*\n`;
 
@@ -965,12 +970,13 @@ function exportWhatsApp() {
   const fullTxt = messages.join('\n─────────────────\n\n');
 
   navigator.clipboard.writeText(fullTxt).then(() => {
-    toast('¡Copiado! Pega en WhatsApp 📱', 'ok');
+    toastClipboard();
   }).catch(() => {
     // Fallback: open in new window for easy copy
     const w = window.open('', '_blank', 'width=600,height=700');
     w.document.write('<html><body style="font-family:monospace;white-space:pre-wrap;padding:20px;background:#111;color:#eee;font-size:13px">' + fullTxt.replace(/</g,'&lt;') + '</body></html>');
     w.document.close();
+    toast('No se pudo copiar — texto abierto en nueva ventana', 'warn');
   });
 }
 
@@ -1372,6 +1378,20 @@ function toast(msg, type='ok') {
   el.textContent = msg; el.className = 'toast show ' + type;
   clearTimeout(toastT);
   toastT = setTimeout(()=>el.classList.remove('show'), 3000);
+}
+
+function toastClipboard() {
+  let el = document.getElementById('clipboardBanner');
+  if (!el) {
+    el = document.createElement('div');
+    el.id = 'clipboardBanner';
+    el.style.cssText = 'position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);background:#1a9e5a;color:#fff;border-radius:12px;padding:22px 32px;font-size:15px;font-weight:700;z-index:9999;box-shadow:0 8px 32px rgba(0,0,0,.25);text-align:center;pointer-events:none;opacity:0;transition:opacity .2s';
+    el.innerHTML = '✅ ¡Copiado al portapapeles!<div style="font-size:11px;font-weight:400;margin-top:6px;opacity:.85">Ya puedes pegar en WhatsApp 📱</div>';
+    document.body.appendChild(el);
+  }
+  el.style.opacity = '1';
+  clearTimeout(el._t);
+  el._t = setTimeout(() => { el.style.opacity = '0'; }, 2500);
 }
 
 function toggleSidebar() {

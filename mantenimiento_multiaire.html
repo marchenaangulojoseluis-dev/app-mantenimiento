@@ -1253,7 +1253,7 @@ function exportPDF() {
   const html = `<!DOCTYPE html>
 <html><head>
 <meta charset="UTF-8">
-<title>Mantenimiento ${currentSede} ${currentPeriodo} ${currentAnio}</title>
+<title>Mantenimiento ${currentSede} ${currentPeriodo} ${currentAnio}${updDateStr ? ' – ' + updDateStr.replace(/[/:]/g,'-') : ''}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body { font-family: Arial, sans-serif; background: #fff; color: #111; font-size: 13px; }

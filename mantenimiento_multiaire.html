@@ -344,6 +344,7 @@ option{background:#fff}
     <div class="sb-group" id="lastUpdatedBar" style="display:none">
       <div class="sb-label">Última actualización</div>
       <div id="lastUpdatedText" style="font-size:12px;color:var(--muted2);font-family:var(--mono)">—</div>
+      <div id="lastUpdatedBy" style="font-size:11px;color:var(--muted);margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></div>
     </div>
 
     <div class="status-bar" id="statusBar" style="display:none">
@@ -480,7 +481,7 @@ let sedeEquipos = [];    // equipos de la sede actual
 let seleccionados = {};  // eq_id → true (equipos seleccionados para este periodo)
 let tareaStatus = {};    // eq_id → {tarea: bool} o eq_id → bool (para solo-marcar)
 let currentSede = '', currentPeriodo = '', currentAnio = '';
-let currentUpdatedAt = null;
+let currentUpdatedAt = null, currentUpdatedBy = null;
 let saveTimeout = null;
 
 // ── INIT ────────────────────────────────────────────────────────────────────
@@ -551,7 +552,7 @@ function onSedeChange() {
   if(!currentSede){ showEmpty(); return; }
   sedeEquipos = allEquipos.filter(e => e.sede === currentSede);
   document.getElementById('btnSelEq').disabled = false;
-  currentUpdatedAt = null;
+  currentUpdatedAt = null; currentUpdatedBy = null;
   renderLastUpdated();
   loadPeriodo();
 }
@@ -561,11 +562,13 @@ function onPeriodoChange() { if(currentSede) loadPeriodo(); }
 function renderLastUpdated() {
   const bar = document.getElementById('lastUpdatedBar');
   const txt = document.getElementById('lastUpdatedText');
+  const byEl = document.getElementById('lastUpdatedBy');
   if (!bar || !txt) return;
   if (!currentUpdatedAt) { bar.style.display = 'none'; return; }
   const d = new Date(currentUpdatedAt);
   const opts = { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit', hour12: false };
   txt.textContent = d.toLocaleString('es-PE', opts);
+  if (byEl) byEl.textContent = currentUpdatedBy || '';
   bar.style.display = 'block';
 }
 
@@ -582,6 +585,7 @@ async function loadPeriodo() {
     seleccionados = d.seleccionados || {};
     tareaStatus  = d.tareaStatus  || {};
     currentUpdatedAt = d.updatedAt || null;
+    currentUpdatedBy = d.updatedBy || null;
     // Don't return early - let normal flow continue to renderChecklist
   } else {
     // Load from Firestore
@@ -598,10 +602,11 @@ async function loadPeriodo() {
       seleccionados = parseField(d.seleccionados);
       tareaStatus = parseField(d.tareaStatus);
       currentUpdatedAt = d.updatedAt || null;
-      sessionStorage.setItem(cacheKey, JSON.stringify({ seleccionados, tareaStatus, updatedAt: currentUpdatedAt }));
+      currentUpdatedBy = d.updatedBy || null;
+      sessionStorage.setItem(cacheKey, JSON.stringify({ seleccionados, tareaStatus, updatedAt: currentUpdatedAt, updatedBy: currentUpdatedBy }));
     } catch(e) {
         seleccionados = {}; tareaStatus = {};
-        currentUpdatedAt = null;
+        currentUpdatedAt = null; currentUpdatedBy = null;
     }
   }
 
@@ -825,11 +830,13 @@ async function doSave() {
   try {
     const { setDoc, doc } = window.__fb;
     const now = new Date().toISOString();
+    const updatedBy = maUser?.email || '';
     await setDoc(doc(window.__db, 'mantenimiento', key), {
-      clave: key, seleccionados, tareaStatus, updatedAt: now
+      clave: key, seleccionados, tareaStatus, updatedAt: now, updatedBy
     });
     currentUpdatedAt = now;
-    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus, updatedAt: now }));
+    currentUpdatedBy = updatedBy;
+    sessionStorage.setItem('ma_maint_' + key, JSON.stringify({ seleccionados, tareaStatus, updatedAt: now, updatedBy }));
     renderLastUpdated();
     if(ind){ ind.classList.remove('show'); ind.classList.add('saved'); ind.innerHTML = '✓ Guardado'; }
     setTimeout(() => { if(ind){ ind.classList.remove('saved'); ind.innerHTML = '<div class="spin"></div> Guardando...'; } }, 2000);

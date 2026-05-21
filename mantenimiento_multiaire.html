@@ -1169,6 +1169,9 @@ function exportPDF() {
 
   const now = new Date();
   const dateStr = now.toLocaleDateString('es-PE',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' ' + now.toLocaleTimeString('es-PE',{hour:'2-digit',minute:'2-digit'});
+  const updOpts = { day:'2-digit', month:'2-digit', year:'numeric', hour:'2-digit', minute:'2-digit', hour12:false };
+  const updDateStr = currentUpdatedAt ? new Date(currentUpdatedAt).toLocaleString('es-PE', updOpts) : null;
+  const updByStr = currentUpdatedBy || null;
 
   const gcol = globalPct===100?'#00cc66':globalPct>0?'#e08800':'#dd3344';
 
@@ -1275,7 +1278,12 @@ function exportPDF() {
       <div style="text-align:right">
         <div style="font-size:15px;font-weight:700">${currentSede}</div>
         <div style="font-size:12px;color:#666">${currentPeriodo} ${currentAnio}</div>
-        <div style="font-size:10px;color:#999;margin-top:2px">${dateStr}</div>
+        <div style="font-size:10px;color:#999;margin-top:2px">Generado: ${dateStr}</div>
+        ${updDateStr ? `<div style="margin-top:8px;padding:7px 10px;background:#f0f4ff;border:1px solid #c8d8f0;border-radius:6px;text-align:left">
+          <div style="font-size:9px;font-weight:700;color:#4466aa;text-transform:uppercase;letter-spacing:.06em;margin-bottom:3px">Última actualización</div>
+          <div style="font-size:11px;font-weight:700;color:#1e3a5f;font-family:monospace">${updDateStr}</div>
+          ${updByStr ? `<div style="font-size:10px;color:#555;margin-top:2px">${updByStr}</div>` : ''}
+        </div>` : ''}
       </div>
     </div>
   </div>
@@ -1314,9 +1322,14 @@ function exportPDF() {
   </div>
 
   <!-- FOOTER -->
-  <div style="border-top:1px solid #dde;margin-top:20px;padding-top:12px;display:flex;justify-content:space-between;font-size:10px;color:#999">
-    <span>MultiAire · Sistema de Gestión de Mantenimiento</span>
-    <span>${dateStr}</span>
+  <div style="border-top:1px solid #dde;margin-top:20px;padding-top:12px;font-size:10px;color:#999">
+    <div style="display:flex;justify-content:space-between;margin-bottom:${updDateStr?'6px':'0'}">
+      <span>MultiAire · Sistema de Gestión de Mantenimiento</span>
+      <span>Generado: ${dateStr}</span>
+    </div>
+    ${updDateStr ? `<div style="display:flex;justify-content:space-between;color:#aaa">
+      <span>Últ. actualización guardada: ${updDateStr}${updByStr ? ' · ' + updByStr : ''}</span>
+    </div>` : ''}
   </div>
 </div>
 

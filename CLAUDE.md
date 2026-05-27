@@ -31,7 +31,7 @@ App cliente puro — sin backend, sin Firestore para datos. Solo Firebase Auth.
 - **Panel Gestión de accesos**: disponible para ADMIN/SUPER_ADMIN — idéntico al de otras apps
 - **Footer**: body `display:flex flex-direction:column` + wrapper `flex:1` siempre visible — footer nunca salta al header durante carga
 - **← Inicio**: usa clase `.back-link` (pill semi-transparente) igual que mantenimiento/asistencia
-- **Estado en develop**: activa | **Estado en producción**: deshabilitada (card gris "EN DESARROLLO")
+- **Estado en develop**: activa | **Estado en producción**: activa
 
 ## Firestore — colecciones
 | Colección | Descripción |
@@ -166,7 +166,7 @@ Patrones obligatorios:
 
 ## index.html — lógica por entorno
 
-- **Producción**: card Insumos en gris, no clickeable, tag "EN DESARROLLO". Asistencia activa.
+- **Producción**: card Insumos en gris, no clickeable, tag "EN DESARROLLO". Asistencia y Rendición de Caja activas.
 - **Develop / Localhost**: todas las cards activas
 - Versión y entorno se muestran dinámicamente según hostname:
   - Producción → `3.3.0` / `Producción`

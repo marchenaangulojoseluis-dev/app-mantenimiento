@@ -269,11 +269,17 @@ footer{border-top:1px solid var(--border);background:var(--surface);padding:14px
       <span>Obtén tu clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> · Se guarda solo en esta sesión</span>
       <div class="key-input-row">
         <input type="password" id="key-input" placeholder="AIza…" autocomplete="off" spellcheck="false">
-        <select id="model-select" style="font-family:var(--mono);font-size:11px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--accent);outline:none;cursor:pointer"></select>
         <button class="btn btn-primary btn-sm" onclick="saveKey()">Guardar clave</button>
       </div>
     </div>
     <div class="key-ok-badge" id="key-ok">✓ Clave activa <button style="background:none;border:none;cursor:pointer;color:var(--muted2);font-size:10px;padding:0 0 0 6px;font-family:var(--mono)" onclick="resetKey()">cambiar</button></div>
+  </div>
+
+  <!-- Model selector bar — siempre visible -->
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;flex-wrap:wrap">
+    <span style="font-size:12px;color:var(--muted2);font-weight:600">Modelo IA:</span>
+    <select id="model-select" style="font-family:var(--mono);font-size:12px;padding:6px 10px;border:1.5px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--accent);outline:none;cursor:pointer;font-weight:600"></select>
+    <span style="font-size:11px;color:var(--muted2)">Si un modelo falla, prueba otro de la lista</span>
   </div>
 
   <!-- Upload zone -->
@@ -469,13 +475,16 @@ let geminiKey = sessionStorage.getItem('cs_gemini_key') || '';
     if(m.id === geminiModelId) opt.selected = true;
     sel.appendChild(opt);
   });
+  function syncModelLabel(){
+    const label = GEMINI_MODELS.find(m=>m.id===geminiModelId)?.label || geminiModelId;
+    const pill = document.querySelector('header .hpill');
+    if(pill) pill.textContent = label;
+  }
+  syncModelLabel();
   sel.addEventListener('change', () => {
     geminiModelId = sel.value;
     sessionStorage.setItem('cs_gemini_model', geminiModelId);
-    const pill = document.querySelector('header .hpill');
-    if(pill) pill.textContent = GEMINI_MODELS.find(m=>m.id===geminiModelId)?.label || geminiModelId;
-    const foot = document.querySelector('.footer-logo:last-of-type');
-    if(foot) foot.textContent = `ComprobaScan · ${GEMINI_MODELS.find(m=>m.id===geminiModelId)?.label||geminiModelId}`;
+    syncModelLabel();
   });
 })();
 
@@ -499,15 +508,11 @@ function resetKey(){
 }
 function showKeyOk(){
   document.getElementById('key-ok').classList.add('show');
-  // Oculta solo el input y el botón, pero mantiene el selector de modelo
-  document.getElementById('key-input').style.display='none';
-  document.querySelector('.key-input-row .btn-primary').style.display='none';
+  document.getElementById('key-input').closest('.key-input-row').style.display='none';
   document.querySelector('#key-banner .key-banner-text strong').style.display='none';
 }
 function showKeyForm(){
   document.getElementById('key-ok').classList.remove('show');
-  document.getElementById('key-input').style.display='';
-  document.querySelector('.key-input-row .btn-primary').style.display='';
   document.getElementById('key-input').closest('.key-input-row').style.display='flex';
   document.querySelector('#key-banner .key-banner-text strong').style.display='block';
 }
@@ -595,12 +600,12 @@ function renderQueue(){
 // ── Gemini API call ─────────────────────────────────────────────
 // Modelos disponibles (en orden de preferencia)
 const GEMINI_MODELS = [
+  { id: 'gemini-2.5-flash',        label: 'Gemini 2.5 Flash'        },
   { id: 'gemini-2.0-flash',        label: 'Gemini 2.0 Flash'        },
-  { id: 'gemini-1.5-flash',        label: 'Gemini 1.5 Flash'        },
   { id: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash Latest' },
-  { id: 'gemini-1.5-pro',          label: 'Gemini 1.5 Pro'          },
+  { id: 'gemini-1.5-pro-latest',   label: 'Gemini 1.5 Pro Latest'   },
 ];
-let geminiModelId = sessionStorage.getItem('cs_gemini_model') || 'gemini-2.0-flash';
+let geminiModelId = sessionStorage.getItem('cs_gemini_model') || 'gemini-2.5-flash';
 function geminiUrl(modelId){ return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`; }
 const GEMINI_PROMPT = `Analiza este comprobante de pago (factura, boleta u otro).
 Responde SOLO con JSON válido sin markdown ni texto adicional:
@@ -616,9 +621,9 @@ Si un campo no es legible escribe null.`;
 
 async function callGemini(base64Data, mimeType){
   if(!geminiKey) throw new Error('No hay clave API configurada');
-  const res = await fetch(`${geminiUrl(geminiModelId)}?key=${geminiKey}`, {
+  const res = await fetch(geminiUrl(geminiModelId), {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
     body: JSON.stringify({
       contents: [{
         parts: [

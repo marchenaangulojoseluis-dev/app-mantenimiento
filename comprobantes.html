@@ -606,6 +606,19 @@ function updateAnalyzeBtn(){
   document.getElementById('btn-analyze').disabled = !geminiKey || !hasPending;
 }
 
+// ── FREE-TIER RATE LIMITER ────────────────────────────────────────────────────
+// Gemini 2.5 Flash free tier: 10 RPM → 1 req cada 6s
+// Gemini 2.0 Flash / 1.5 Flash free tier: 15 RPM → 1 req cada 4s
+const FREE_TIER_DELAY_MS = 6500; // 6.5s — margen sobre el límite de 10 RPM
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+async function geminiRateDelay(statusEl, prefix){
+  for(let s = Math.round(FREE_TIER_DELAY_MS / 1000); s > 0; s--){
+    statusEl.textContent = `${prefix} · ⏳ ${s}s (límite free tier)…`;
+    await sleep(1000);
+  }
+}
+
 // ── FILE → BASE64 (imagen o PDF pág.1 → JPEG comprimido) ──────────────────────
 const MAX_PX = 1600;
 
@@ -752,7 +765,7 @@ async function analyzeAll(){
   const statusEl = document.getElementById('analyze-status');
   btn.disabled = true;
 
-  let done = 0, errors = 0;
+  let done = 0, errors = 0, callIdx = 0;
   for(let i = 0; i < pendingFiles.length; i++){
     if(pendingFiles[i].status !== 'pending') continue;
 
@@ -766,7 +779,9 @@ async function analyzeAll(){
         const pages = await pdfToPages(pendingFiles[i].file, i);
         let fileOk = true;
         for(let p = 0; p < pages.length; p++){
-          statusEl.textContent = `Archivo ${done + 1}/${toProcess.length} · pág. ${p+1}/${pages.length}…`;
+          const ctx = `Archivo ${done + 1}/${toProcess.length} · pág. ${p+1}/${pages.length}`;
+          if(callIdx++ > 0) await geminiRateDelay(statusEl, ctx);
+          statusEl.textContent = ctx + '…';
           const label = pages.length > 1
             ? `${pendingFiles[i].file.name} · p.${p+1}`
             : pendingFiles[i].file.name;
@@ -785,7 +800,9 @@ async function analyzeAll(){
         else { pendingFiles[i].status = 'error'; }
       } else {
         // ── Image file ──────────────────────────────────────────────────────
-        statusEl.textContent = `Analizando ${done + 1} de ${toProcess.length}…`;
+        const ctx = `Analizando ${done + 1} de ${toProcess.length}`;
+        if(callIdx++ > 0) await geminiRateDelay(statusEl, ctx);
+        statusEl.textContent = ctx + '…';
         const { b64, mime } = await fileToBase64(pendingFiles[i].file);
         const parsed = await callGeminiForImage(b64, mime);
         pendingFiles[i].status = 'ok';

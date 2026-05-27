@@ -218,3 +218,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | ComprobaScan: ← Inicio usa .back-link (pill transparente) igual que mantenimiento/asistencia |
 | 2026-05-27 | ComprobaScan: soporte PDF multi-página — cada página → Gemini independiente → fila propia en tabla |
 | 2026-05-27 | ComprobaScan: API key y modelo pasan de sessionStorage a localStorage — persisten entre sesiones; botón 🗑 Borrar |
+| 2026-05-27 | ComprobaScan: rate limiter free tier — 6.5s entre llamadas Gemini con cuenta regresiva visible en status |

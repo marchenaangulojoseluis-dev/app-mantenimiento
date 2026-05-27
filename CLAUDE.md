@@ -24,7 +24,7 @@ App cliente puro — sin backend, sin Firestore para datos. Solo Firebase Auth.
 - **Imágenes**: comprimidas a máx 1600px JPEG 0.85 antes de enviar
 - **API key**: en `localStorage` clave `cs_gemini_key` — persiste entre sesiones; botón 🗑 Borrar en key-status
 - **Modelo guardado**: en `localStorage` clave `cs_gemini_model` — validar contra lista VALID_IDS al cargar
-- **Columnas Excel**: FECHA, COMP, NUMERO, RUC, PROVEEDOR, DESCRIPCION (manual, obligatoria), MONTO
+- **Columnas Excel**: FECHA, N°BOLETA / FACTURA, NUMERO, RUC, PROVEEDOR, DESCRIPCION (manual, obligatoria), VALOR
 - **Tipos de comprobante**: `FT`=Factura, `BO`=Boleta, `TK`=Ticket, `NC`=Nota de Crédito, `OT`=Otro
 - **Gemini output**: `responseMimeType:'application/json'` + `responseSchema` con enum de tipos — fuerza JSON válido siempre
 - **Prompt**: describe cada campo con ejemplos reales (NO template JSON con valores placeholder)
@@ -240,3 +240,8 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | Rendición de Caja: responsive móvil mejorado + botón 📷 Tomar foto (capture=environment) |
 | 2026-05-27 | CLAUDE.md: regla general — todas las apps deben ser responsivas, patrones obligatorios documentados |
 | 2026-05-27 | index.html: regla permanente — Configuración siempre es la última card del panel |
+| 2026-05-27 | Rendición de Caja: default modelo gemini-2.5-flash-lite (1000 RPD), delay 4.5s free tier |
+| 2026-05-27 | Rendición de Caja: fix API key input alineado izquierda en móvil (align-items:stretch) |
+| 2026-05-27 | Rendición de Caja: col-ruc min-width 130px, col-prov 200px en móvil |
+| 2026-05-27 | Rendición de Caja: botón 📷 Tomar foto oculto en desktop, visible solo en móvil |
+| 2026-05-27 | Rendición de Caja: habilitada en producción — probada en celular ✓ |

@@ -240,3 +240,8 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | Rendición de Caja: responsive móvil mejorado + botón 📷 Tomar foto (capture=environment) |
 | 2026-05-27 | CLAUDE.md: regla general — todas las apps deben ser responsivas, patrones obligatorios documentados |
 | 2026-05-27 | index.html: regla permanente — Configuración siempre es la última card del panel |
+| 2026-05-27 | Rendición de Caja: default modelo gemini-2.5-flash-lite (1000 RPD), delay 4.5s free tier |
+| 2026-05-27 | Rendición de Caja: fix API key input alineado izquierda en móvil (align-items:stretch) |
+| 2026-05-27 | Rendición de Caja: col-ruc min-width 130px, col-prov 200px en móvil |
+| 2026-05-27 | Rendición de Caja: botón 📷 Tomar foto oculto en desktop, visible solo en móvil |
+| 2026-05-27 | Rendición de Caja: habilitada en producción — probada en celular ✓ |

@@ -166,8 +166,8 @@ tr:hover td{background:var(--surface2)}
   .upload-buttons{flex-direction:column;align-items:stretch}
   .upload-buttons .btn{justify-content:center;width:100%}
   .btn-camera{display:flex}  /* mostrar siempre en móvil */
-  .form-row{flex-direction:column}
-  .form-row .btn{align-self:stretch;justify-content:center}
+  .form-row{flex-direction:column;align-items:stretch}
+  .form-row .btn{align-self:stretch;justify-content:center;width:100%}
   .analyze-bar{flex-direction:column;align-items:stretch}
   .analyze-bar .btn{justify-content:center}
 }
@@ -208,7 +208,7 @@ tr:hover td{background:var(--surface2)}
         <input type="password" id="api-key-input" class="form-input"
                placeholder="Pega tu API key de Google AI Studio..." autocomplete="off">
       </div>
-      <button class="btn btn-primary" onclick="saveKey()" style="align-self:flex-end">💾 Guardar key</button>
+      <button class="btn btn-primary" onclick="saveKey()">💾 Guardar key</button>
     </div>
     <div id="key-status" style="margin-top:8px;font-size:11px"></div>
     <div style="margin-top:16px">

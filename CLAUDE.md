@@ -6,9 +6,32 @@ Vanilla HTML/JS, sin framework. Firebase Firestore como base de datos (SDK compa
 No hay servidor — todo corre en el browser con Firebase Auth + Firestore directo.
 
 ## Archivos principales
-- `asistencia_multiaire.html` — app principal, todo en un solo archivo
+- `asistencia_multiaire.html` — gestión de asistencia del personal
+- `comprobantes.html` — Rendición de Caja: escáner de facturas/boletas con Gemini IA
 - `firebase-config.js` — config pública de Firebase (project: `multiaire-fee43`)
 - `wsp_import/importar_asistencia.py` — script Python para importar asistencia desde ZIP de WhatsApp
+
+## Rendición de Caja (`comprobantes.html`)
+> Antes llamada "ComprobaScan" — renombrada 2026-05-27
+App cliente puro — sin backend, sin Firestore para datos. Solo Firebase Auth.
+- **IA**: Google Gemini REST API directo desde el browser
+- **Auth API**: header `x-goog-api-key: <key>` (NO query param `?key=`)
+- **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
+- **Modelo default**: `gemini-2.5-flash-lite` (1000 RPD free) | Alternativa: `gemini-2.5-flash` (250 RPD free, más capaz)
+- **Modelos retirados**: `gemini-2.0-flash` (deprecated, shutdown jun-2026), `gemini-1.5-flash-latest`, `gemini-1.5-pro-latest` (discontinuados)
+- **Selector de modelo**: pills custom (NO `<select>` — el CSS global `appearance:none` lo rompe)
+- **File input**: `<label for="file-input">` (NO `.click()` JS — Brave lo bloquea)
+- **Imágenes**: comprimidas a máx 1600px JPEG 0.85 antes de enviar
+- **API key**: en `localStorage` clave `cs_gemini_key` — persiste entre sesiones; botón 🗑 Borrar en key-status
+- **Modelo guardado**: en `localStorage` clave `cs_gemini_model` — validar contra lista VALID_IDS al cargar
+- **Columnas Excel**: FECHA, COMP, NUMERO, RUC, PROVEEDOR, DESCRIPCION (manual, obligatoria), MONTO
+- **Tipos de comprobante**: `FT`=Factura, `BO`=Boleta, `TK`=Ticket, `NC`=Nota de Crédito, `OT`=Otro
+- **Gemini output**: `responseMimeType:'application/json'` + `responseSchema` con enum de tipos — fuerza JSON válido siempre
+- **Prompt**: describe cada campo con ejemplos reales (NO template JSON con valores placeholder)
+- **Panel Gestión de accesos**: disponible para ADMIN/SUPER_ADMIN — idéntico al de otras apps
+- **Footer**: body `display:flex flex-direction:column` + wrapper `flex:1` siempre visible — footer nunca salta al header durante carga
+- **← Inicio**: usa clase `.back-link` (pill semi-transparente) igual que mantenimiento/asistencia
+- **Estado en develop**: activa | **Estado en producción**: activa
 
 ## Firestore — colecciones
 | Colección | Descripción |
@@ -71,6 +94,10 @@ function calcHorasExtra(entrada, salida, fecha) {
 - `8.5` = 08:30, `18.0` = 18:00, `19.5` = 19:30
 - Redondeo a media hora: `round(h * 2) / 2`
 
+## Orden de cards en index.html
+**Configuración es siempre la última card del panel de apps.** Cualquier app nueva se inserta antes de Configuración.
+Orden actual: Inv. Equipos → Mantenimiento → Itinerario → Insumos → Asistencia → Rendición de Caja → Configuración
+
 ## Tabs de la app
 1. **Hoy** — registro del día, entrada/salida por colaborador
 2. **Historial** — registros por rango de fechas
@@ -106,6 +133,16 @@ Script Python `importar_asistencia.py`:
 - `ADMIN` — gestión completa
 - `SUPERVISOR` — solo lectura
 
+## Responsive — regla general
+**Todas las apps deben ser responsivas y funcionar en teléfono.** Breakpoint principal: `@media(max-width:768px)`.
+Patrones obligatorios:
+- Header: ocultar textos secundarios, reducir padding, avatar circular sin nombre
+- Cards/secciones: reducir padding (`14px` en móvil)
+- Botones de acción: `width:100%` y `justify-content:center` en móvil
+- Tablas: siempre dentro de `<div class="table-scroll">` con `overflow-x:auto`
+- Formularios con `flex-row`: `flex-direction:column` en móvil
+- Upload zone: soportar cámara con `<input capture="environment">` + botón "📷 Tomar foto"
+
 ## Notas técnicas
 - Firebase SDK compat (no modular) — `firebase.initializeApp()`
 - Brave browser bloquea Firebase longpolling → ERR_BLOCKED_BY_CLIENT en consola, inofensivo
@@ -129,7 +166,7 @@ Script Python `importar_asistencia.py`:
 
 ## index.html — lógica por entorno
 
-- **Producción**: card Insumos en gris, no clickeable, tag "EN DESARROLLO". Asistencia activa.
+- **Producción**: card Insumos en gris, no clickeable, tag "EN DESARROLLO". Asistencia y Rendición de Caja activas.
 - **Develop / Localhost**: todas las cards activas
 - Versión y entorno se muestran dinámicamente según hostname:
   - Producción → `3.3.0` / `Producción`
@@ -182,4 +219,24 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-21 | Mantenimiento: guarda y muestra `updatedBy` (correo del usuario) junto con `updatedAt` en sidebar, Firestore y sessionStorage |
 | 2026-05-21 | Mantenimiento PDF: header muestra recuadro de última actualización (fecha/hora + correo); footer muestra línea de última actualización; nombre del archivo incluye fecha/hora de actualización |
 | 2026-05-21 | Mantenimiento PDF: se elimina "Generado: [hora]" del header — solo queda en footer |
+| 2026-05-27 | Nueva app ComprobaScan (`comprobantes.html`): escáner de facturas/boletas con IA, tabla editable, exportación a Excel (SheetJS) — activa en develop, deshabilitada en producción |
+| 2026-05-27 | ComprobaScan: IA usa Google Gemini (REST directo, sin backend). Auth: header `x-goog-api-key`. Modelo default: `gemini-2.5-flash`. Lista: 2.5-flash, 2.0-flash, 1.5-flash-latest, 1.5-pro-latest |
+| 2026-05-27 | ComprobaScan: selector de modelo como pills (no `<select>` — CSS global lo rompía). File input con `<label for>` (no `.click()` JS — Brave lo bloqueaba) |
+| 2026-05-27 | ComprobaScan: imágenes comprimidas a máx 1600px / JPEG 0.85 antes de enviar a Gemini |
+| 2026-05-27 | ComprobaScan: columnas Excel — FECHA, COMP, NUMERO, RUC, PROVEEDOR, DESCRIPCION (manual obligatoria), MONTO |
+| 2026-05-27 | SSH configurado: clave ed25519 en ~/.ssh/id_ed25519_github, remote cambiado a git@github.com — no pide contraseña |
 | 2026-05-21 | Mantenimiento WSP: mensaje incluye fecha/hora de última actualización en cursiva (_Actualizado: ..._); confirmación de copiado cambia a banner verde centrado en pantalla |
+| 2026-05-27 | ComprobaScan: rewrite completo desde cero — header/auth/footer idéntico a insumos.html, todos los bugs corregidos |
+| 2026-05-27 | ComprobaScan: tipos de comprobante a 2 siglas — FT=Factura, BO=Boleta, TK=Ticket, NC=Nota de Crédito, OT=Otro |
+| 2026-05-27 | ComprobaScan: Gemini fuerza JSON con responseMimeType+responseSchema; prompt reescrito con ejemplos reales |
+| 2026-05-27 | ComprobaScan: panel Gestión de accesos para ADMIN/SUPER_ADMIN — lista usuarios, cambia roles, asigna apps |
+| 2026-05-27 | ComprobaScan: fix footer jump — wrapper flex:1 permanente evita que footer suba al header durante carga |
+| 2026-05-27 | ComprobaScan: ← Inicio usa .back-link (pill transparente) igual que mantenimiento/asistencia |
+| 2026-05-27 | ComprobaScan: soporte PDF multi-página — cada página → Gemini independiente → fila propia en tabla |
+| 2026-05-27 | ComprobaScan: API key y modelo pasan de sessionStorage a localStorage — persisten entre sesiones; botón 🗑 Borrar |
+| 2026-05-27 | ComprobaScan: rate limiter free tier — 6.5s entre llamadas Gemini con cuenta regresiva visible en status |
+| 2026-05-27 | ComprobaScan: actualiza lista de modelos — retira gemini-2.0-flash (deprecated jun-2026) y 1.5-flash/pro; agrega gemini-2.5-flash-lite y gemini-3.5-flash |
+| 2026-05-27 | Rendición de Caja: renombrada desde ComprobaScan/FacturasIA — card movida antes de Configuración |
+| 2026-05-27 | Rendición de Caja: responsive móvil mejorado + botón 📷 Tomar foto (capture=environment) |
+| 2026-05-27 | CLAUDE.md: regla general — todas las apps deben ser responsivas, patrones obligatorios documentados |
+| 2026-05-27 | index.html: regla permanente — Configuración siempre es la última card del panel |

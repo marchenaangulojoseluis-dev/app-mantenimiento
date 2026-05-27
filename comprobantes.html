@@ -565,18 +565,19 @@ function fileToBase64(file){
 }
 
 // ── GEMINI PROMPT ─────────────────────────────────────────────────────────────
-const GEMINI_PROMPT = `Analiza esta imagen de un comprobante de pago peruano.
-Responde SOLO con este JSON exacto (sin markdown, sin texto adicional):
-{"fecha":"DD/MM/YYYY","tipo":"F","numero":"","ruc":"","proveedor":"","monto":0.00}
+const GEMINI_PROMPT = `Eres un extractor de datos de comprobantes de pago peruanos (facturas, boletas, tickets).
+Analiza la imagen y extrae los datos. Responde ÚNICAMENTE con JSON válido, sin markdown ni texto adicional.
 
-Reglas:
-- fecha: formato DD/MM/YYYY. Si no se lee claramente usa "".
-- tipo: "F"=Factura, "B"=Boleta, "T"=Ticket, "O"=Otro.
-- numero: número completo incluyendo serie (ej: "F001-00012345").
-- ruc: RUC o DNI del EMISOR, solo dígitos.
-- proveedor: nombre del emisor/empresa en MAYÚSCULAS.
-- monto: total numérico con decimales, sin símbolo de moneda.
-Responde ÚNICAMENTE el JSON.`;
+Claves requeridas:
+- "fecha": string DD/MM/YYYY (ejemplo: "27/05/2026"). Si no se lee usa "".
+- "tipo": "F" para Factura, "B" para Boleta, "T" para Ticket, "O" para Otro.
+- "numero": número completo con serie (ejemplo: "F001-00001234"). Si no se lee usa "".
+- "ruc": RUC o DNI del emisor, solo dígitos (ejemplo: "20512345678"). Si no se lee usa "".
+- "proveedor": razón social del emisor en MAYÚSCULAS (ejemplo: "FERREYROS S.A."). Si no se lee usa "".
+- "monto": número decimal con el total a pagar (ejemplo: 150.00). Si no se lee usa 0.
+
+Responde SOLO el JSON. Ejemplo de respuesta válida:
+{"fecha":"27/05/2026","tipo":"F","numero":"F001-00001234","ruc":"20512345678","proveedor":"FERREYROS S.A.","monto":150.00}`;
 
 // ── ANALYZE ───────────────────────────────────────────────────────────────────
 async function analyzeAll(){
@@ -607,7 +608,7 @@ async function analyzeAll(){
             { inline_data: { mime_type: mime, data: b64 } },
             { text: GEMINI_PROMPT }
           ]}],
-          generationConfig: { temperature: 0, maxOutputTokens: 512 }
+          generationConfig: { temperature: 0, maxOutputTokens: 1024 }
         })
       });
 
@@ -619,17 +620,38 @@ async function analyzeAll(){
         toast(`Imagen ${i+1}: ${errMsg}`, 'err');
       } else {
         const data    = await res.json();
-        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+        // Check finish reason (SAFETY = blocked, OTHER = failed)
+        const finishReason = data?.candidates?.[0]?.finishReason;
+        if(finishReason && finishReason !== 'STOP' && finishReason !== 'MAX_TOKENS'){
+          pendingFiles[i].status = 'error';
+          errors++;
+          toast(`Imagen ${i+1}: Gemini no pudo procesar (${finishReason})`, 'err');
+          renderThumbs();
+          continue;
+        }
+        const rawText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        console.log('[ComprobaScan] Gemini raw response:', rawText);
         let parsed = {};
-        try{
-          const clean = rawText.replace(/```(?:json)?/gi,'').replace(/```/g,'').trim();
-          parsed = JSON.parse(clean);
-        }catch(_){
-          toast(`Imagen ${i+1}: respuesta inesperada de la IA`, 'err');
+        if(!rawText){
+          toast(`Imagen ${i+1}: Gemini no devolvió texto`, 'err');
+        } else {
+          try{
+            const clean = rawText.replace(/```(?:json)?/gi,'').replace(/```/g,'').trim();
+            parsed = JSON.parse(clean);
+          }catch(_){
+            // Try to extract JSON from partial response
+            const match = rawText.match(/\{[\s\S]*\}/);
+            if(match){ try{ parsed = JSON.parse(match[0]); }catch(e2){ console.warn('[ComprobaScan] Parse failed:', rawText); } }
+            if(!parsed || !Object.keys(parsed).length)
+              toast(`Imagen ${i+1}: respuesta inesperada de Gemini`, 'err');
+          }
         }
         pendingFiles[i].status = 'ok';
         pendingFiles[i].result = parsed;
         appendRow(parsed, pendingFiles[i].file.name);
+        // Warn if all fields came back empty
+        const hasData = parsed.fecha || parsed.numero || parsed.ruc || parsed.proveedor || parsed.monto;
+        if(!hasData) toast(`Imagen ${i+1}: no se detectaron datos — ¿imagen clara de un comprobante?`, 'err');
         done++;
       }
     }catch(e){

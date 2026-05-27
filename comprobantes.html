@@ -279,7 +279,7 @@ footer{border-top:1px solid var(--border);background:var(--surface);padding:14px
   <!-- Model selector bar — siempre visible -->
   <div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;background:var(--surface);border:1.5px solid var(--border);border-radius:10px;padding:10px 16px;flex-wrap:wrap">
     <span style="font-size:12px;color:var(--muted2);font-weight:600;white-space:nowrap">🤖 Modelo IA:</span>
-    <select id="model-select" style="width:auto;appearance:auto;-webkit-appearance:auto;font-family:var(--mono);font-size:12px;padding:6px 10px;border:1.5px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--accent);outline:none;cursor:pointer;font-weight:600;flex-shrink:0"></select>
+    <select id="model-select" style="width:auto;min-width:200px;appearance:auto;-webkit-appearance:menulist;font-family:var(--mono);font-size:12px;padding:6px 10px;border:1.5px solid var(--border2);border-radius:6px;background:var(--surface2);color:var(--accent);outline:none;cursor:pointer;font-weight:600;flex-shrink:0"></select>
     <span style="font-size:11px;color:var(--muted2)">· Si un modelo falla, cambia a otro</span>
   </div>
 
@@ -606,7 +606,10 @@ const GEMINI_MODELS = [
   { id: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash Latest' },
   { id: 'gemini-1.5-pro-latest',   label: 'Gemini 1.5 Pro Latest'   },
 ];
-let geminiModelId = sessionStorage.getItem('cs_gemini_model') || 'gemini-2.5-flash';
+// Si el modelo guardado ya no existe en la lista, resetearlo
+const _savedModel = sessionStorage.getItem('cs_gemini_model');
+const VALID_IDS = ['gemini-2.5-flash','gemini-2.0-flash','gemini-1.5-flash-latest','gemini-1.5-pro-latest'];
+let geminiModelId = (VALID_IDS.includes(_savedModel) ? _savedModel : null) || 'gemini-2.5-flash';
 function geminiUrl(modelId){ return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`; }
 const GEMINI_PROMPT = `Analiza este comprobante de pago (factura, boleta u otro).
 Responde SOLO con JSON válido sin markdown ni texto adicional:

@@ -457,10 +457,9 @@ function toast(msg, type){
 
 // ── GEMINI CONFIG ─────────────────────────────────────────────────────────────
 const GEMINI_MODELS = [
-  { id:'gemini-2.5-flash',        label:'Gemini 2.5 Flash'  },
-  { id:'gemini-2.0-flash',        label:'Gemini 2.0 Flash'  },
-  { id:'gemini-1.5-flash-latest', label:'1.5 Flash Latest'  },
-  { id:'gemini-1.5-pro-latest',   label:'1.5 Pro Latest'    },
+  { id:'gemini-2.5-flash',      label:'2.5 Flash'      },  // default — mejor relación precio/calidad
+  { id:'gemini-2.5-flash-lite', label:'2.5 Flash Lite' },  // más rápido y barato
+  { id:'gemini-3.5-flash',      label:'3.5 Flash'      },  // más capaz
 ];
 const VALID_IDS = GEMINI_MODELS.map(m => m.id);
 
@@ -607,8 +606,9 @@ function updateAnalyzeBtn(){
 }
 
 // ── FREE-TIER RATE LIMITER ────────────────────────────────────────────────────
-// Gemini 2.5 Flash free tier: 10 RPM → 1 req cada 6s
-// Gemini 2.0 Flash / 1.5 Flash free tier: 15 RPM → 1 req cada 4s
+// Gemini 2.5 Flash free tier: 10 RPM, 250 RPD → 1 req cada 6s mínimo
+// Gemini 2.5 Flash Lite / 3.5 Flash: 15 RPM → 1 req cada 4s mínimo
+// Usamos 6.5s para cubrir el modelo más restrictivo (2.5 Flash, 10 RPM)
 const FREE_TIER_DELAY_MS = 6500; // 6.5s — margen sobre el límite de 10 RPM
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 

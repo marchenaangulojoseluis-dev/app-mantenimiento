@@ -16,7 +16,8 @@ App cliente puro — sin backend, sin Firestore para datos. Solo Firebase Auth.
 - **IA**: Google Gemini REST API directo desde el browser
 - **Auth API**: header `x-goog-api-key: <key>` (NO query param `?key=`)
 - **Endpoint**: `https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent`
-- **Modelo default**: `gemini-2.5-flash` | Lista: `gemini-2.5-flash`, `gemini-2.0-flash`, `gemini-1.5-flash-latest`, `gemini-1.5-pro-latest`
+- **Modelo default**: `gemini-2.5-flash` | Lista: `gemini-2.5-flash`, `gemini-2.5-flash-lite`, `gemini-3.5-flash`
+- **Modelos retirados**: `gemini-2.0-flash` (deprecated, shutdown jun-2026), `gemini-1.5-flash-latest`, `gemini-1.5-pro-latest` (discontinuados)
 - **Selector de modelo**: pills custom (NO `<select>` — el CSS global `appearance:none` lo rompe)
 - **File input**: `<label for="file-input">` (NO `.click()` JS — Brave lo bloquea)
 - **Imágenes**: comprimidas a máx 1600px JPEG 0.85 antes de enviar
@@ -219,3 +220,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | ComprobaScan: soporte PDF multi-página — cada página → Gemini independiente → fila propia en tabla |
 | 2026-05-27 | ComprobaScan: API key y modelo pasan de sessionStorage a localStorage — persisten entre sesiones; botón 🗑 Borrar |
 | 2026-05-27 | ComprobaScan: rate limiter free tier — 6.5s entre llamadas Gemini con cuenta regresiva visible en status |
+| 2026-05-27 | ComprobaScan: actualiza lista de modelos — retira gemini-2.0-flash (deprecated jun-2026) y 1.5-flash/pro; agrega gemini-2.5-flash-lite y gemini-3.5-flash |

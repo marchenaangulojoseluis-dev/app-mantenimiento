@@ -133,6 +133,16 @@ Script Python `importar_asistencia.py`:
 - `ADMIN` — gestión completa
 - `SUPERVISOR` — solo lectura
 
+## Responsive — regla general
+**Todas las apps deben ser responsivas y funcionar en teléfono.** Breakpoint principal: `@media(max-width:768px)`.
+Patrones obligatorios:
+- Header: ocultar textos secundarios, reducir padding, avatar circular sin nombre
+- Cards/secciones: reducir padding (`14px` en móvil)
+- Botones de acción: `width:100%` y `justify-content:center` en móvil
+- Tablas: siempre dentro de `<div class="table-scroll">` con `overflow-x:auto`
+- Formularios con `flex-row`: `flex-direction:column` en móvil
+- Upload zone: soportar cámara con `<input capture="environment">` + botón "📷 Tomar foto"
+
 ## Notas técnicas
 - Firebase SDK compat (no modular) — `firebase.initializeApp()`
 - Brave browser bloquea Firebase longpolling → ERR_BLOCKED_BY_CLIENT en consola, inofensivo
@@ -226,5 +236,7 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | ComprobaScan: API key y modelo pasan de sessionStorage a localStorage — persisten entre sesiones; botón 🗑 Borrar |
 | 2026-05-27 | ComprobaScan: rate limiter free tier — 6.5s entre llamadas Gemini con cuenta regresiva visible en status |
 | 2026-05-27 | ComprobaScan: actualiza lista de modelos — retira gemini-2.0-flash (deprecated jun-2026) y 1.5-flash/pro; agrega gemini-2.5-flash-lite y gemini-3.5-flash |
-| 2026-05-27 | Rendición de Caja: renombrada desde ComprobaScan — card movida antes de Configuración en index.html |
+| 2026-05-27 | Rendición de Caja: renombrada desde ComprobaScan/FacturasIA — card movida antes de Configuración |
+| 2026-05-27 | Rendición de Caja: responsive móvil mejorado + botón 📷 Tomar foto (capture=environment) |
+| 2026-05-27 | CLAUDE.md: regla general — todas las apps deben ser responsivas, patrones obligatorios documentados |
 | 2026-05-27 | index.html: regla permanente — Configuración siempre es la última card del panel |

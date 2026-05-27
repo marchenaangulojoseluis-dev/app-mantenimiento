@@ -269,6 +269,7 @@ footer{border-top:1px solid var(--border);background:var(--surface);padding:14px
       <span>Obtén tu clave gratuita en <a href="https://aistudio.google.com/apikey" target="_blank">aistudio.google.com/apikey</a> · Se guarda solo en esta sesión</span>
       <div class="key-input-row">
         <input type="password" id="key-input" placeholder="AIza…" autocomplete="off" spellcheck="false">
+        <select id="model-select" style="font-family:var(--mono);font-size:11px;padding:8px 10px;border:1.5px solid var(--border2);border-radius:6px;background:var(--surface);color:var(--accent);outline:none;cursor:pointer"></select>
         <button class="btn btn-primary btn-sm" onclick="saveKey()">Guardar clave</button>
       </div>
     </div>
@@ -456,6 +457,26 @@ document.addEventListener('click', e => {
 
 // ── API Key ─────────────────────────────────────────────────────
 let geminiKey = sessionStorage.getItem('cs_gemini_key') || '';
+
+// Inicializa selector de modelos
+(function initModelSelect(){
+  const sel = document.getElementById('model-select');
+  GEMINI_MODELS.forEach(m => {
+    const opt = document.createElement('option');
+    opt.value = m.id; opt.textContent = m.label;
+    if(m.id === geminiModelId) opt.selected = true;
+    sel.appendChild(opt);
+  });
+  sel.addEventListener('change', () => {
+    geminiModelId = sel.value;
+    sessionStorage.setItem('cs_gemini_model', geminiModelId);
+    const pill = document.querySelector('header .hpill');
+    if(pill) pill.textContent = GEMINI_MODELS.find(m=>m.id===geminiModelId)?.label || geminiModelId;
+    const foot = document.querySelector('.footer-logo:last-of-type');
+    if(foot) foot.textContent = `ComprobaScan · ${GEMINI_MODELS.find(m=>m.id===geminiModelId)?.label||geminiModelId}`;
+  });
+})();
+
 (function initKey(){
   if(geminiKey){ showKeyOk(); } else { showKeyForm(); }
 })();
@@ -476,11 +497,15 @@ function resetKey(){
 }
 function showKeyOk(){
   document.getElementById('key-ok').classList.add('show');
-  document.getElementById('key-input').closest('.key-input-row').style.display='none';
+  // Oculta solo el input y el botón, pero mantiene el selector de modelo
+  document.getElementById('key-input').style.display='none';
+  document.querySelector('.key-input-row .btn-primary').style.display='none';
   document.querySelector('#key-banner .key-banner-text strong').style.display='none';
 }
 function showKeyForm(){
   document.getElementById('key-ok').classList.remove('show');
+  document.getElementById('key-input').style.display='';
+  document.querySelector('.key-input-row .btn-primary').style.display='';
   document.getElementById('key-input').closest('.key-input-row').style.display='flex';
   document.querySelector('#key-banner .key-banner-text strong').style.display='block';
 }
@@ -557,8 +582,15 @@ function renderQueue(){
 }
 
 // ── Gemini API call ─────────────────────────────────────────────
-const GEMINI_MODEL = 'gemini-1.5-flash';
-const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+// Modelos disponibles (en orden de preferencia)
+const GEMINI_MODELS = [
+  { id: 'gemini-2.0-flash',        label: 'Gemini 2.0 Flash'        },
+  { id: 'gemini-1.5-flash',        label: 'Gemini 1.5 Flash'        },
+  { id: 'gemini-1.5-flash-latest', label: 'Gemini 1.5 Flash Latest' },
+  { id: 'gemini-1.5-pro',          label: 'Gemini 1.5 Pro'          },
+];
+let geminiModelId = sessionStorage.getItem('cs_gemini_model') || 'gemini-2.0-flash';
+function geminiUrl(modelId){ return `https://generativelanguage.googleapis.com/v1beta/models/${modelId}:generateContent`; }
 const GEMINI_PROMPT = `Analiza este comprobante de pago (factura, boleta u otro).
 Responde SOLO con JSON válido sin markdown ni texto adicional:
 {
@@ -573,7 +605,7 @@ Si un campo no es legible escribe null.`;
 
 async function callGemini(base64Data, mimeType){
   if(!geminiKey) throw new Error('No hay clave API configurada');
-  const res = await fetch(`${GEMINI_URL}?key=${geminiKey}`, {
+  const res = await fetch(`${geminiUrl(geminiModelId)}?key=${geminiKey}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({

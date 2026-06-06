@@ -273,3 +273,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-06-06 | Insumos: etiquetas con formato seleccionable QR o código de barras Code128 (JsBarcode). Selector QR/Barras en modal de etiqueta y en exportación ZIP (catálogo e instancias) |
 | 2026-06-06 | Insumos: escáner renombrado "Escanear QR / Barras" (html5-qrcode ya leía ambos); qrbox horizontal adaptable (mejor encuadre de barras 1D en móvil); botones de resultado "Ver QR"→"Ver etiqueta"; flex-wrap en barras de selección para móvil |
 | 2026-06-06 | Insumos: scroll horizontal en tablas en TODAS las pantallas — `.table-wrap` base pasa de `overflow:hidden` a `overflow-x:auto` (antes solo en móvil; en desktop con muchas columnas se cortaban) |
+| 2026-06-06 | Insumos: columnas fijas (checkbox + Código/ID) al hacer scroll horizontal en tablas Catálogo e Instancias — `position:sticky` con fondo sólido, hover consistente y separador; checkbox ancho fijo 44px |

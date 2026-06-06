@@ -45,7 +45,7 @@ Modelo de 3 niveles:
 ### Carga inicial de inventario (2026-06-06)
 - Origen: Excel "CONTROL DE INVENTARIO DE HERRAMIENTAS POR TECNICO" → Hoja2 (CONTROL INVENTARIO).
 - "ALMACÉN CENTRAL" del Excel = sede **OFICINA** (Chinchón Oficina, `TIE013`).
-- Importadas 46 tipos de catálogo + 52 instancias + 5 paquetes-anaquel (`ANAQUEL 02 · PLANO 01–04` + GENERAL).
+- Importadas 46 tipos de catálogo + 52 instancias + 1 paquete-anaquel (`ANAQUEL 02`). El plano físico (PLANO 0X) NO es contenedor: queda como detalle en la instancia (campo `plano` + reflejado en `notas`).
 - Mapeo estado: BUENO→DISPONIBLE, MALO/INCOMPLETO→DETERIORADO, vacío→DISPONIBLE. Docs marcados con `origen:'IMPORT_HOJA2'`.
 - Script de importación: `~/Documents/migrar_db/import_hoja2.js` (firebase-admin + serviceAccount).
 - **PENDIENTE**: las 3 hojas restantes (HERR. ROT., CONTROL EQUIPOS, HERR FIJAS por técnico) y agregar las colecciones `insumos_*` al backup de `configuracion.html`.
@@ -268,4 +268,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-05-27 | Rendición de Caja: habilitada en producción — probada en celular ✓ |
 | 2026-06-06 | Insumos: documentado el modelo de 3 niveles (catálogo/instancias/paquetes) en CLAUDE.md |
 | 2026-06-06 | Insumos: carga inicial desde Excel Hoja2 — 46 tipos + 52 instancias + 5 paquetes-anaquel en sede OFICINA (Chinchón). Script migrar_db/import_hoja2.js |
-| 2026-06-06 | Insumos: ubicación física del almacén modelada como paquete tipo ANAQUEL (ANAQUEL 02 · PLANO 01–04 + GENERAL) |
+| 2026-06-06 | Insumos: ubicación física del almacén = un único paquete tipo ANAQUEL (`ANAQUEL 02`); el plano (PLANO 0X) es solo un detalle de la instancia (campo `plano` + notas), no un contenedor |

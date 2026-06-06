@@ -2816,21 +2816,21 @@ async function generateBarcodeCanvas(id) {
   const ctx = canvas.getContext('2d');
   ctx.fillStyle = '#ffffff';
   ctx.fillRect(0, 0, W, H);
-  // Barra alargada (1D): se estira a casi todo el ancho con altura moderada → aspecto horizontal.
-  // La altura de las barras no codifica información, así que estirarla es válido y mejora la lectura.
-  const targetW = Math.round(W * 0.92);
-  const targetH = Math.round(H * 0.55);
+  // Barra alargada (1D): se estira para llenar la etiqueta (ancho ~94%, alto ~66%) con márgenes
+  // mínimos. La altura de las barras no codifica información, así que estirarla es válido.
+  const targetW = Math.round(W * 0.94);
+  const targetH = Math.round(H * 0.66);
   const bc = document.createElement('canvas');
   try {
     JsBarcode(bc, String(id), { format: 'CODE128', width: 6, height: targetH, displayValue: false, margin: 0 });
   } catch (e) { return null; }
   ctx.imageSmoothingEnabled = false;   // bordes nítidos al estirar
-  ctx.drawImage(bc, Math.round((W - targetW) / 2), Math.round(H * 0.13), targetW, targetH);
+  ctx.drawImage(bc, Math.round((W - targetW) / 2), Math.round(H * 0.08), targetW, targetH);
   // Código en texto, chiquito, centrado debajo
   ctx.fillStyle = '#000000';
-  ctx.font = `bold ${Math.round(H * 0.10)}px monospace`;
+  ctx.font = `bold ${Math.round(H * 0.12)}px monospace`;
   ctx.textAlign = 'center';
-  ctx.fillText(codigo, W / 2, Math.round(H * 0.90));
+  ctx.fillText(codigo, W / 2, Math.round(H * 0.93));
   return canvas;
 }
 

@@ -53,12 +53,12 @@ Modelo de 3 niveles:
 - Las otras hojas del Excel (HERR. ROT., CONTROL EQUIPOS, HERR FIJAS por técnico) **NO se importan** — fuera de alcance. La carga del Excel queda completa con el almacén central (Hoja2).
 - **Backup**: las 4 colecciones `insumos_*` se exportan/importan en `configuracion.html` (catálogo/instancias en columnas; paquetes con `instancias[]` unidas por `|`; movimientos como doc JSON por su esquema variable). El `parseCSV` se reescribió como parser correcto (maneja `""` y saltos de línea citados) para soportar las celdas JSON.
 - **CSV Phomemo**: `exportInstCSVPhomemo()` exporta un CSV (`CODIGO,NOMBRE`, con BOM UTF-8) de las instancias seleccionadas (o todas) para impresión por lotes en impresoras térmicas Phomemo (etiquetas 40×30 mm) vía Print Master/Labelife, donde el barcode lo genera la app desde la columna `CODIGO`. Botón "📄 CSV (Phomemo)" en la barra de selección de Instancias.
-- Opcional pendiente: recategorizar los 4 ítems sin categoría (manómetros) que el Excel dejó en blanco.
+- ~~Opcional pendiente: recategorizar los 4 ítems sin categoría (manómetros) que el Excel dejó en blanco.~~ Hecho 2026-06-08: `GEN-01` "MANOMETRO" (4 instancias) → categoría **MEDICION**. Script `~/Documents/migrar_db/recat_manometros.js`.
 
 ## Firestore — colecciones
 | Colección | Descripción |
 |---|---|
-| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo) |
+| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~200×200) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
 | `asistencia_registros` | Registros de asistencia diaria |
 | `maestros_feriados` | Feriados (campo `fecha`: YYYY-MM-DD) |
 | `usuarios` | Usuarios del sistema con roles |
@@ -284,3 +284,7 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-06-06 | Insumos: barra estirada para llenar la etiqueta (~94% ancho × ~66% alto, márgenes mínimos, `imageSmoothingEnabled=false`) |
 | 2026-06-06 | Insumos: **activado en producción** — `index.html` deja de marcarlo "EN DESARROLLO" (array vacío); todas las cards activas en prod. Merge develop→main |
 | 2026-06-06 | Insumos: export "📄 CSV (Phomemo)" en barra de selección de Instancias — CSV `CODIGO,NOMBRE` (BOM UTF-8) para impresión por lotes en impresoras térmicas Phomemo 40×30 mm (la app dibuja el barcode desde la columna CODIGO) |
+| 2026-06-08 | Fotos del personal: campo `foto` en `maestros_personal` = **imagen base64** (dataURL JPEG 200×200, recorte centrado, calidad 0.8) guardada en el propio documento de Firestore. Editor de personal en `configuracion.html`: botón 📷 por fila comprime y guarda la imagen; miniatura circular al inicio de cada fila. Se persiste al "Guardar cambios" (preservada en `loadMaestros`/`saveMaestros`). **Sin Firebase Storage** — Storage exige plan Blaze; base64 en Firestore funciona en Spark (gratis) y basta para esta escala (~15 colaboradores, fotos diminutas) |
+| 2026-06-08 | Insumos: tab "Por Técnico" muestra cabecera con avatar del técnico (foto de `maestros_personal` o inicial de respaldo) en `renderPorTecnico` |
+| 2026-06-08 | Backup (`configuracion.html`): columna `FOTO` agregada al export/import CSV de `maestros_personal` |
+| 2026-06-08 | Insumos (datos): recategorizado `GEN-01` "MANOMETRO" (4 instancias) de SIN CATEGORIA → MEDICION en Firestore. Script `migrar_db/recat_manometros.js` |

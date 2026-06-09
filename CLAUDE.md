@@ -58,7 +58,7 @@ Modelo de 3 niveles:
 ## Firestore — colecciones
 | Colección | Descripción |
 |---|---|
-| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = downloadURL de Firebase Storage (`personal/<id>`) |
+| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~200×200) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
 | `asistencia_registros` | Registros de asistencia diaria |
 | `maestros_feriados` | Feriados (campo `fecha`: YYYY-MM-DD) |
 | `usuarios` | Usuarios del sistema con roles |
@@ -284,7 +284,7 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-06-06 | Insumos: barra estirada para llenar la etiqueta (~94% ancho × ~66% alto, márgenes mínimos, `imageSmoothingEnabled=false`) |
 | 2026-06-06 | Insumos: **activado en producción** — `index.html` deja de marcarlo "EN DESARROLLO" (array vacío); todas las cards activas en prod. Merge develop→main |
 | 2026-06-06 | Insumos: export "📄 CSV (Phomemo)" en barra de selección de Instancias — CSV `CODIGO,NOMBRE` (BOM UTF-8) para impresión por lotes en impresoras térmicas Phomemo 40×30 mm (la app dibuja el barcode desde la columna CODIGO) |
-| 2026-06-08 | Fotos del personal: campo `foto` en `maestros_personal` (downloadURL de Firebase Storage, ruta `personal/<id>`). Editor de personal en `configuracion.html` carga `firebase-storage-compat.js`; botón 📷 por fila comprime la imagen a 200×200 (recorte centrado, JPEG 0.82) y la sube; miniatura circular al inicio de cada fila. La URL se persiste al "Guardar cambios" (preservada en `loadMaestros`/`saveMaestros`) |
+| 2026-06-08 | Fotos del personal: campo `foto` en `maestros_personal` = **imagen base64** (dataURL JPEG 200×200, recorte centrado, calidad 0.8) guardada en el propio documento de Firestore. Editor de personal en `configuracion.html`: botón 📷 por fila comprime y guarda la imagen; miniatura circular al inicio de cada fila. Se persiste al "Guardar cambios" (preservada en `loadMaestros`/`saveMaestros`). **Sin Firebase Storage** — Storage exige plan Blaze; base64 en Firestore funciona en Spark (gratis) y basta para esta escala (~15 colaboradores, fotos diminutas) |
 | 2026-06-08 | Insumos: tab "Por Técnico" muestra cabecera con avatar del técnico (foto de `maestros_personal` o inicial de respaldo) en `renderPorTecnico` |
 | 2026-06-08 | Backup (`configuracion.html`): columna `FOTO` agregada al export/import CSV de `maestros_personal` |
 | 2026-06-08 | Insumos (datos): recategorizado `GEN-01` "MANOMETRO" (4 instancias) de SIN CATEGORIA → MEDICION en Firestore. Script `migrar_db/recat_manometros.js` |

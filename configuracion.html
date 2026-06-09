@@ -207,12 +207,10 @@ main{flex:1;padding:32px 24px 48px;max-width:960px;width:100%;margin:0 auto}
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script>
   // Initialize Firebase using config from firebase-config.js
   const _fbApp = firebase.initializeApp(window.__firebaseConfig);
   window.__db = firebase.firestore();
-  window.__storage = firebase.storage();
   window.__auth = firebase.auth();
   window.__prov = new firebase.auth.GoogleAuthProvider();
   window.__fb = {
@@ -1481,13 +1479,13 @@ function renderPersonal() {
       <input class="maestro-cargo" type="text" inputmode="numeric" value="${(p.telefono||'').replace(/^51/,'')}" onchange="updatePersonal(${i},'telefono',this.value)" placeholder="—" title="Solo 9 dígitos — se agrega prefijo 51 automáticamente" style="width:130px" autocomplete="off">
       ${cargoBadgeHtml(p.cargo)}
       <label class="maestro-foto-btn" for="per-foto-${i}" title="Subir / cambiar foto">📷</label>
-      <input type="file" id="per-foto-${i}" accept="image/*" style="display:none" onchange="uploadPersonalFoto(${i}, this.files[0]); this.value='';">
+      <input type="file" id="per-foto-${i}" accept="image/*" style="display:none" onchange="setPersonalFoto(${i}, this.files[0]); this.value='';">
       <button class="maestro-toggle" onclick="togglePersonal(${i})" title="${p.activo==='SI'?'Desactivar':'Activar'}">${p.activo==='SI'?'✅':'⭕'}</button>
       <button class="maestro-del" onclick="deletePersonal(${i})" title="Eliminar">✕</button>
     </div>`).join('');
 }
 
-// Comprime una imagen a un cuadrado de `size`px (recorte centrado) → Blob JPEG
+// Comprime una imagen a un cuadrado de `size`px (recorte centrado) → dataURL JPEG (base64)
 function compressSquare(file, size, quality) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
@@ -1502,7 +1500,7 @@ function compressSquare(file, size, quality) {
         canvas.width = size; canvas.height = size;
         const ctx = canvas.getContext('2d');
         ctx.drawImage(img, sx, sy, side, side, 0, 0, size, size);
-        canvas.toBlob(b => b ? resolve(b) : reject(new Error('No se pudo procesar la imagen')), 'image/jpeg', quality);
+        resolve(canvas.toDataURL('image/jpeg', quality));
       };
       img.onerror = () => reject(new Error('Imagen inválida'));
       img.src = reader.result;
@@ -1511,7 +1509,9 @@ function compressSquare(file, size, quality) {
   });
 }
 
-async function uploadPersonalFoto(i, file) {
+// Guarda la foto como base64 (dataURL) en el campo `foto` — se persiste en Firestore
+// al "Guardar cambios". No usa Firebase Storage (evita el plan Blaze).
+async function setPersonalFoto(i, file) {
   if (!file) return;
   if (!maUser || ['ADMIN','SUPER_ADMIN'].indexOf(maUser.rol) === -1) { toast('Solo admins pueden subir fotos', 'err'); return; }
   const p = maestrosData.personal[i];
@@ -1519,16 +1519,13 @@ async function uploadPersonalFoto(i, file) {
   if (!/^image\//.test(file.type)) { toast('El archivo no es una imagen', 'err'); return; }
   try {
     toast('Procesando foto...');
-    const blob = await compressSquare(file, 200, 0.82);
-    const ref = window.__storage.ref('personal/' + p.id);
-    const snap = await ref.put(blob, { contentType: 'image/jpeg' });
-    const url = await snap.ref.getDownloadURL();
-    maestrosData.personal[i].foto = url;
+    const dataUrl = await compressSquare(file, 200, 0.8);
+    maestrosData.personal[i].foto = dataUrl;
     maestrosChanged = true;
     renderPersonal();
-    toast('Foto subida — recuerda Guardar cambios', 'ok');
+    toast('Foto lista — recuerda Guardar cambios', 'ok');
   } catch(e) {
-    toast('Error subiendo foto: ' + (e.message || e), 'err');
+    toast('Error procesando foto: ' + (e.message || e), 'err');
   }
 }
 

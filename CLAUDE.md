@@ -39,7 +39,7 @@ Modelo de 3 niveles:
 - **Catálogo** (`insumos_catalogo`) — el *tipo* de ítem. Código único obligatorio. id = código.
 - **Instancia** (`insumos_instancias`) — cada *unidad física* del tipo, con su propio id/código, sede, estado y opcional `paqueteId`. Estados: `DISPONIBLE`, `EN_USO`, `MANTENIMIENTO`, `DETERIORADO`, `BAJA`.
 - **Paquete** (`insumos_paquetes`) — contenedor que agrupa instancias. Relación **bidireccional**: `paquete.instancias[]` ↔ `instancia.paqueteId`. Tipos: MOCHILA, CAJA, CAJON, **ANAQUEL**, MALETÍN, OTRO.
-- Pestañas: Catálogo · Instancias · Movimientos · Por Sede · Paquetes · Por Técnico.
+- Pestañas: Catálogo · Instancias · Movimientos · Por Sede · Paquetes · Por Persona (antes "Por Técnico"; ids internos `tecnicos`/`tab-tecnicos` sin cambiar).
 - **Etiquetas**: cada ítem/instancia genera etiqueta descargable (PNG individual o ZIP). Formato seleccionable **QR** (qrcodejs) o **código de barras Code128** (JsBarcode) vía selector `setLabelFmt()`/`labelFmt`; ambos codifican el `id`. Generadores: `generateQRCanvas`/`generateInstQRCanvas`/`generateBarcodeCanvas`, despachados por `genLabelCanvas()`.
 - **Etiqueta de barras = media hoja**: `generateBarcodeCanvas` produce una etiqueta de proporción **400×150 mm** (8:3, mitad de un papel 400×300). El código de barras va **alargado** y llena la etiqueta (estirado a ~94% del ancho × ~66% del alto, márgenes mínimos; `imageSmoothingEnabled=false` para bordes nítidos) y el código en texto chiquito debajo, **sin nombre**. Se descarga individual o en ZIP; el usuario acomoda 2 por hoja al imprimir.
 - **Ubicación física en almacén** = paquete tipo ANAQUEL (no hay campos `anaquel`/`sitio` en instancia; se modela como contenedor).
@@ -58,7 +58,7 @@ Modelo de 3 niveles:
 ## Firestore — colecciones
 | Colección | Descripción |
 |---|---|
-| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~200×200) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
+| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~320×320) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
 | `asistencia_registros` | Registros de asistencia diaria |
 | `maestros_feriados` | Feriados (campo `fecha`: YYYY-MM-DD) |
 | `usuarios` | Usuarios del sistema con roles |
@@ -66,6 +66,7 @@ Modelo de 3 niveles:
 | `insumos_instancias` | Unidades físicas individuales (itemId→catalogo, sede, estado, paqueteId, responsable, notas) |
 | `insumos_movimientos` | Entradas/salidas/transferencias/actualizaciones de instancias |
 | `insumos_paquetes` | Contenedores (MOCHILA/CAJA/CAJON/ANAQUEL/MALETÍN) que agrupan instancias vía array `instancias[]` |
+| `insumos_instancias_fotos` | Foto (identificación) de cada instancia. Doc id = id de instancia. Campo `foto` = base64 (dataURL JPEG 320×320). **Colección aparte** (no dentro del doc de instancia) para no inflar las lecturas/exportaciones de `insumos_instancias`; se carga junto al resto en `loadAll` |
 
 ### Schema `asistencia_registros`
 ```js
@@ -288,3 +289,9 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-06-08 | Insumos: tab "Por Técnico" muestra cabecera con avatar del técnico (foto de `maestros_personal` o inicial de respaldo) en `renderPorTecnico` |
 | 2026-06-08 | Backup (`configuracion.html`): columna `FOTO` agregada al export/import CSV de `maestros_personal` |
 | 2026-06-08 | Insumos (datos): recategorizado `GEN-01` "MANOMETRO" (4 instancias) de SIN CATEGORIA → MEDICION en Firestore. Script `migrar_db/recat_manometros.js` |
+| 2026-06-10 | Fotos del personal: avatar del tab "Por Técnico" agrandado de 56px → 96px (inicial 38px); captura de foto subida de 200×200 → 320×320 (sigue base64 en Firestore, ~40 KB). La miniatura del editor de personal se mantiene en 34px |
+| 2026-06-10 | Insumos tab "Por Técnico": opción **"👥 Todos"** en el selector (es el valor por defecto al abrir el tab) — muestra una grilla de tarjetas de todo el personal (avatar + cargo + nº paquetes/instancias sueltas); clic en una tarjeta abre su detalle. `renderPorTecnico` ahora es dispatcher (`renderTodosTecnicos`/`renderTecnicoDetalle`); helper `tecnicoResponsables()` unifica la lista (personal activo + responsables de paquetes/instancias) |
+| 2026-06-10 | Insumos: tab renombrado **"👤 Por Técnico" → "👥 Por Persona"** (textos visibles: botón, placeholder del selector y empty state). Los ids internos `tecnicos`/`tab-tecnicos`/`f-tec-persona` se mantienen |
+| 2026-06-10 | Personal: rellenadas 11 fotos faltantes desde "DATOS PARA FOTOCHECK.docx" (emparejadas por nombre, recorte cuadrado 320×320 base64). Scripts en `~/Documents/migrar_db/fotocheck/`. Sin foto: ENRIQUE YARANGA, JESÚS MARTÍNEZ, JOSE MARCHENA (no estaban en el docx) |
+| 2026-06-10 | Insumos: **foto por instancia** (identificación). Nueva colección `insumos_instancias_fotos` (base64, colección aparte). Subida desde el modal de edición de instancia (botón 📷, `setInstanciaFoto`/`removeInstanciaFoto`); miniatura en la celda ID/QR de la tabla (`instThumb`). Añadida al backup/import de `configuracion.html` |
+| 2026-06-10 | Insumos foto de instancia: **lightbox** para ampliar (clic en preview del modal o en miniatura de la tabla → visor `foto-lightbox` a pantalla completa), botón **📸 Tomar foto** (`capture=environment`, clase `.cam-only-mobile` visible solo en móvil) además del de subir, y resolución de captura subida a **480×480** para que ampliar se vea bien. Responsive verificado (modal tipo sheet en móvil, lightbox en vw/vh) |

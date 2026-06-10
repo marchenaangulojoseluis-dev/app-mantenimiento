@@ -84,6 +84,7 @@ optgroup{font-style:normal;font-weight:700;color:var(--muted2)}
 
 /* ── MOBILE RESPONSIVE ─────────────────────────────────── */
 @media(max-width:768px){
+  .cam-only-mobile{display:inline-flex}
   /* Header compacto */
   header{padding:0 12px;height:52px;gap:8px}
   .logo{font-size:14px}
@@ -271,10 +272,27 @@ tbody td{padding:9px 12px;vertical-align:middle}
 .tec-section{margin-bottom:20px}
 .tec-section-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted2);margin-bottom:8px;padding-bottom:4px;border-bottom:1px solid var(--border)}
 .tec-head{display:flex;align-items:center;gap:14px;margin-bottom:18px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:12px}
-.tec-head-avatar{width:56px;height:56px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--orange);display:block}
-.tec-head-init{width:56px;height:56px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--orange);color:#fff;font-size:22px;font-weight:700;border:2px solid var(--orange)}
+.tec-head-avatar{width:96px;height:96px;border-radius:50%;flex-shrink:0;object-fit:cover;border:2px solid var(--orange);display:block}
+.tec-head-init{width:96px;height:96px;border-radius:50%;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:var(--orange);color:#fff;font-size:38px;font-weight:700;border:2px solid var(--orange)}
 .tec-head-name{font-size:16px;font-weight:700;color:var(--accent)}
 .tec-head-cargo{font-size:12px;color:var(--muted2);margin-top:2px}
+.tec-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.tec-card{display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;padding:16px 12px;background:var(--surface);border:1px solid var(--border);border-radius:12px;cursor:pointer;transition:all .15s}
+.tec-card:hover{border-color:var(--orange);box-shadow:0 2px 8px rgba(0,0,0,.06);transform:translateY(-2px)}
+.tec-card-avatar{width:64px;height:64px;border-radius:50%;object-fit:cover;border:2px solid var(--orange);display:block}
+.tec-card-init{width:64px;height:64px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:var(--orange);color:#fff;font-size:26px;font-weight:700;border:2px solid var(--orange)}
+.tec-card-name{font-size:12px;font-weight:700;color:var(--accent);line-height:1.2}
+.tec-card-cargo{font-size:10px;color:var(--muted2)}
+.tec-card-stats{font-size:11px;color:var(--muted2);margin-top:2px}
+.inst-foto-preview{width:64px;height:64px;border-radius:8px;object-fit:cover;border:1.5px solid var(--border);display:block}
+.inst-foto-empty{width:64px;height:64px;border-radius:8px;border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:22px;background:var(--surface2)}
+.inst-thumb{width:30px;height:30px;border-radius:6px;object-fit:cover;border:1px solid var(--border);cursor:pointer;display:block;flex-shrink:0}
+.inst-thumb-empty{width:30px;height:30px;border-radius:6px;border:1px dashed var(--border);display:flex;align-items:center;justify-content:center;color:var(--muted);font-size:12px;cursor:pointer;background:var(--surface2);flex-shrink:0}
+.cam-only-mobile{display:none}
+.foto-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.85);display:none;align-items:center;justify-content:center;z-index:3000;padding:20px;cursor:zoom-out}
+.foto-lightbox.open{display:flex}
+.foto-lightbox img{max-width:92vw;max-height:86vh;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.5);cursor:default}
+.foto-lightbox-close{position:absolute;top:14px;right:18px;font-size:30px;color:#fff;cursor:pointer;line-height:1;background:none;border:none}
 .tip-item{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted2)}
 .pending-badge{background:var(--orange);color:#fff;border-radius:10px;font-size:9px;font-weight:700;padding:1px 5px;margin-left:4px;font-family:var(--mono)}
 .modal-overlay{position:fixed;inset:0;background:rgba(10,20,50,.45);backdrop-filter:blur(2px);z-index:200;display:none;align-items:center;justify-content:center;padding:16px;cursor:pointer}.modal-overlay .modal{cursor:default}
@@ -371,7 +389,7 @@ tbody td{padding:9px 12px;vertical-align:middle}
       <button class="tab-btn" onclick="switchTab('movimientos',this)">📋 Movimientos</button>
       <button class="tab-btn" onclick="switchTab('stock',this)">🏢 Por Sede</button>
       <button class="tab-btn" onclick="switchTab('paquetes',this)">🎒 Paquetes</button>
-      <button class="tab-btn" onclick="switchTab('tecnicos',this)">👤 Por Técnico</button>
+      <button class="tab-btn" onclick="switchTab('tecnicos',this)">👥 Por Persona</button>
     </div>
 
     <div class="tab-view active" id="tab-catalogo">
@@ -471,9 +489,9 @@ tbody td{padding:9px 12px;vertical-align:middle}
     <!-- TAB POR TÉCNICO -->
     <div class="tab-view" id="tab-tecnicos">
       <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap">
-        <select id="f-tec-persona" onchange="renderPorTecnico()" style="max-width:240px;font-size:12px"><option value="">Seleccionar técnico...</option></select>
+        <select id="f-tec-persona" onchange="renderPorTecnico()" style="max-width:240px;font-size:12px"><option value="">Seleccionar...</option></select>
       </div>
-      <div id="tecnico-content"><div class="empty"><div class="empty-icon">👤</div>Selecciona un técnico para ver su inventario</div></div>
+      <div id="tecnico-content"><div class="empty"><div class="empty-icon">👥</div>Selecciona una persona o "Todos" para ver su inventario</div></div>
     </div>
   </div>
 </div>
@@ -940,6 +958,15 @@ tbody td{padding:9px 12px;vertical-align:middle}
     </div>
     <div class="modal-body" style="display:flex;flex-direction:column;gap:12px">
       <div style="font-family:var(--mono);font-size:12px;color:var(--muted2);background:var(--surface2);padding:8px 12px;border-radius:6px" id="inst-edit-id-display"></div>
+      <div class="form-group full"><div class="form-label">Foto</div>
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <div id="fe-inst-foto-box" style="display:flex;align-items:center;gap:8px"></div>
+          <label class="btn btn-sm" for="fe-inst-foto-input" style="cursor:pointer">📷 Subir / cambiar</label>
+          <input type="file" id="fe-inst-foto-input" accept="image/*" style="display:none" onchange="setInstanciaFoto(this.files[0]); this.value='';">
+          <label class="btn btn-sm cam-only-mobile" for="fe-inst-foto-cam" style="cursor:pointer">📸 Tomar foto</label>
+          <input type="file" id="fe-inst-foto-cam" accept="image/*" capture="environment" style="display:none" onchange="setInstanciaFoto(this.files[0]); this.value='';">
+        </div>
+      </div>
       <div class="form-group full"><div class="form-label">Sede *</div><select class="form-select" id="fe-inst-sede"></select></div>
       <div id="fe-inst-nivel-wrap" style="display:none" class="form-group full">
         <div class="form-label">Nivel actual</div>
@@ -963,6 +990,12 @@ tbody td{padding:9px 12px;vertical-align:middle}
       <button class="btn btn-primary" onclick="updateInstancia()">💾 Guardar</button>
     </div>
   </div>
+</div>
+
+<!-- LIGHTBOX FOTO INSTANCIA -->
+<div class="foto-lightbox" id="foto-lightbox" onclick="closeInstFotoLightbox()">
+  <button class="foto-lightbox-close" onclick="closeInstFotoLightbox()" title="Cerrar">✕</button>
+  <img id="foto-lightbox-img" src="" alt="" onclick="event.stopPropagation()">
 </div>
 
 <!-- MODAL QR -->
@@ -1116,7 +1149,7 @@ const PERMS = {
 };
 function can(p){ return (PERMS[maUser?.rol]||PERMS.TECNICO)[p]||0; }
 
-let maUser=null, catalogoData=[], movimientosData=[], stockData={}, sedes=[], personalData=[], paquetesData=[], instanciasData=[];
+let maUser=null, catalogoData=[], movimientosData=[], stockData={}, sedes=[], personalData=[], paquetesData=[], instanciasData=[], instFotos={};
 let filteredCatalogo=[], currentMovTipo='SALIDA', editingInsumoId=null, editingPaqId=null, applyingPaqId=null, paqRowIdx=0;
 
 // ── AUTH — mismo sistema que otras apps ──────────────────────────────────────
@@ -1367,14 +1400,16 @@ function buildSidebar(){
 
 async function loadAll(){
   try{
-    const [catS,movS,tiendasS,persS,paqS,instS]=await Promise.all([
+    const [catS,movS,tiendasS,persS,paqS,instS,instFotoS]=await Promise.all([
       db.collection('insumos_catalogo').get(),
       db.collection('insumos_movimientos').orderBy('fecha','desc').limit(200).get(),
       db.collection('maestros_tiendas').get(),
       db.collection('maestros_personal').get(),
       db.collection('insumos_paquetes').get(),
       db.collection('insumos_instancias').get(),
+      db.collection('insumos_instancias_fotos').get(),
     ]);
+    instFotos={}; instFotoS.docs.forEach(d=>{const f=d.data().foto; if(f) instFotos[d.id]=f;});
     catalogoData=catS.docs.map(d=>({id:d.id,...d.data()}));
     movimientosData=movS.docs.map(d=>({id:d.id,...d.data()}));
     stockData={};
@@ -1394,8 +1429,8 @@ async function loadAll(){
     if(fPkgSede) fPkgSede.innerHTML='<option value="">Todas las sedes</option>'+sedes.map(s=>`<option value="${s.sede}">${s.sede}</option>`).join('');
     const fTec = document.getElementById('f-tec-persona');
     if(fTec) {
-      const responsables = [...new Set([...personalData.map(p=>p.nombre), ...paquetesData.map(p=>p.responsable).filter(Boolean)])].sort();
-      fTec.innerHTML = '<option value="">Seleccionar técnico...</option>' + responsables.map(r=>`<option value="${r}">${r}</option>`).join('');
+      fTec.innerHTML = '<option value="">Seleccionar...</option><option value="__ALL__">👥 Todos</option>' + tecnicoResponsables().map(r=>`<option value="${r}">${r}</option>`).join('');
+      if(!fTec.value){ fTec.value='__ALL__'; renderPorTecnico(); }
     }
   }catch(e){toast('Error: '+e.message,'err');}
 }
@@ -1424,14 +1459,17 @@ function renderAll(){
   const fTec = document.getElementById('f-tec-persona');
   if(fTec) {
     const current = fTec.value;
-    const responsables = [...new Set([
-      ...personalData.map(p=>p.nombre),
-      ...paquetesData.map(p=>p.responsable).filter(Boolean),
-      ...instanciasData.map(i=>i.responsable).filter(Boolean)
-    ])].sort();
-    fTec.innerHTML = '<option value="">Seleccionar técnico...</option>' + responsables.map(r=>`<option value="${r}">${r}</option>`).join('');
+    fTec.innerHTML = '<option value="">Seleccionar...</option><option value="__ALL__">👥 Todos</option>' + tecnicoResponsables().map(r=>`<option value="${r}">${r}</option>`).join('');
     if(current) fTec.value = current;
   }
+}
+
+// Miniatura de la foto de una instancia (o placeholder clicable para agregar)
+function instThumb(id){
+  const f = instFotos[id];
+  return f
+    ? `<img class="inst-thumb" src="${f}" onclick="event.stopPropagation();openInstFotoLightbox('${id}')" title="Ampliar foto" alt="">`
+    : `<div class="inst-thumb-empty" onclick="openEditInstancia('${id}')" title="Sin foto — clic para agregar">📷</div>`;
 }
 
 function renderInstancias() {
@@ -1488,7 +1526,7 @@ function renderInstancias() {
     const estColor = estadoColor[est] || 'ok';
     return `<tr>
       <td style='text-align:center'><input type='checkbox' class='inst-qr-chk' data-id='${inst.id}' onchange='updateInstQRSelection()'></td>
-      <td class="td-code" style="font-weight:700">${inst.id}</td>
+      <td class="td-code" style="font-weight:700"><div style="display:flex;align-items:center;gap:6px">${instThumb(inst.id)}<span>${inst.id}</span></div></td>
       <td style="font-size:11px">${inst.nombre || (item ? item.nombre : '—')}</td>
       <td style="font-size:11px">${inst.sede || '—'}</td>
       <td>${nivelHtml}</td>
@@ -2681,6 +2719,80 @@ function exportInstCSVPhomemo() {
 let editingInstanciaId = null;
 
 
+// Comprime imagen a un cuadrado de `size`px (recorte centrado) → dataURL JPEG
+function compressSquare(file, size, quality) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const side = Math.min(img.width, img.height);
+        const sx = (img.width - side) / 2, sy = (img.height - side) / 2;
+        const c = document.createElement('canvas');
+        c.width = size; c.height = size;
+        c.getContext('2d').drawImage(img, sx, sy, side, side, 0, 0, size, size);
+        resolve(c.toDataURL('image/jpeg', quality));
+      };
+      img.onerror = () => reject(new Error('Imagen inválida'));
+      img.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+// Refresca la vista previa de la foto en el modal de instancia
+function refreshInstFotoPreview() {
+  const box = document.getElementById('fe-inst-foto-box');
+  if (!box) return;
+  const f = instFotos[editingInstanciaId];
+  box.innerHTML = f
+    ? `<img src="${f}" class="inst-foto-preview" alt="" style="cursor:zoom-in" onclick="openInstFotoLightbox(editingInstanciaId)" title="Ampliar"><button type="button" class="btn btn-sm" onclick="removeInstanciaFoto()" title="Quitar foto">🗑</button>`
+    : `<div class="inst-foto-empty">📷</div>`;
+}
+
+// Amplía la foto de una instancia en un visor a pantalla completa
+function openInstFotoLightbox(id){
+  const f = instFotos[id];
+  if(!f) return;
+  document.getElementById('foto-lightbox-img').src = f;
+  document.getElementById('foto-lightbox').classList.add('open');
+}
+function closeInstFotoLightbox(){
+  document.getElementById('foto-lightbox').classList.remove('open');
+  document.getElementById('foto-lightbox-img').src = '';
+}
+
+// Sube/reemplaza la foto de la instancia (colección aparte insumos_instancias_fotos)
+async function setInstanciaFoto(file) {
+  if (!file || !editingInstanciaId) return;
+  if (!/^image\//.test(file.type)) { toast('El archivo no es una imagen', 'err'); return; }
+  try {
+    toast('Procesando foto...');
+    const dataUrl = await compressSquare(file, 480, 0.8);
+    await db.collection('insumos_instancias_fotos').doc(editingInstanciaId).set({
+      foto: dataUrl, instanciaId: editingInstanciaId,
+      updatedAt: new Date().toISOString(), updatedBy: maUser ? maUser.email : ''
+    });
+    instFotos[editingInstanciaId] = dataUrl;
+    refreshInstFotoPreview();
+    renderInstancias();
+    toast('✓ Foto guardada', 'ok');
+  } catch(e) { toast('Error con la foto: ' + (e.message || e), 'err'); }
+}
+
+async function removeInstanciaFoto() {
+  if (!editingInstanciaId || !instFotos[editingInstanciaId]) return;
+  if (!confirm('¿Quitar la foto de esta instancia?')) return;
+  try {
+    await db.collection('insumos_instancias_fotos').doc(editingInstanciaId).delete();
+    delete instFotos[editingInstanciaId];
+    refreshInstFotoPreview();
+    renderInstancias();
+    toast('Foto eliminada', 'ok');
+  } catch(e) { toast('Error: ' + (e.message || e), 'err'); }
+}
+
 function openEditInstancia(instId) {
   const inst = instanciasData.find(x => x.id === instId);
   if (!inst) return;
@@ -2695,6 +2807,7 @@ function openEditInstancia(instId) {
   document.getElementById('fe-inst-notas').value = inst.notas || '';
   document.getElementById('fe-inst-nivel-wrap').style.display = esRango ? 'block' : 'none';
   if (esRango && inst.nivel !== undefined) document.getElementById('fe-inst-nivel').value = inst.nivel;
+  refreshInstFotoPreview();
   document.getElementById('modal-inst-edit').classList.add('open');
 }
 
@@ -3956,7 +4069,53 @@ function renderPorTecnico() {
   const wrap = document.getElementById('tecnico-content');
   if (!wrap) return;
   const tec = document.getElementById('f-tec-persona')?.value||'';
-  if (!tec) { wrap.innerHTML='<div class="empty"><div class="empty-icon">👤</div>Selecciona un técnico</div>'; return; }
+  if (!tec) { wrap.innerHTML='<div class="empty"><div class="empty-icon">👤</div>Selecciona una persona o "Todos"</div>'; return; }
+  if (tec === '__ALL__') { wrap.innerHTML = renderTodosTecnicos(); return; }
+  wrap.innerHTML = renderTecnicoDetalle(tec);
+}
+
+// Lista de personas/responsables (personal activo + responsables de paquetes/instancias)
+function tecnicoResponsables(){
+  return [...new Set([
+    ...personalData.map(p=>p.nombre),
+    ...paquetesData.map(p=>p.responsable).filter(Boolean),
+    ...instanciasData.map(i=>i.responsable).filter(Boolean)
+  ])].sort();
+}
+
+function selectTecnico(nombre){
+  const el=document.getElementById('f-tec-persona');
+  if(el){ el.value=nombre; renderPorTecnico(); }
+}
+
+// Vista "Todos": grilla de tarjetas (avatar + resumen) por persona; clic → detalle
+function renderTodosTecnicos(){
+  const gente = tecnicoResponsables();
+  if(!gente.length) return '<div class="empty"><div class="empty-icon">👥</div>Sin personal registrado</div>';
+  let h=`<div class="tec-section-title" style="margin-bottom:12px">👥 Todo el personal (${gente.length}) — clic en una persona para ver su detalle</div>`;
+  h+=`<div class="tec-grid">`;
+  h+=gente.map(nom=>{
+    const persona = personalData.find(p=>p.nombre===nom);
+    const nPkgs = paquetesData.filter(p=>p.responsable===nom).length;
+    const nSueltas = instanciasData.filter(i=>i.responsable===nom&&!i.paqueteId&&i.estado!=='BAJA').length;
+    const inicial = (nom||'?').trim().charAt(0).toUpperCase();
+    const av = persona && persona.foto
+      ? `<img class="tec-card-avatar" src="${persona.foto}" alt="${nom}">`
+      : `<div class="tec-card-init">${inicial}</div>`;
+    const nomEsc = nom.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    return `<div class="tec-card" onclick="selectTecnico('${nomEsc}')" title="Ver detalle de ${nom}">
+      ${av}
+      <div class="tec-card-name">${nom}</div>
+      ${persona&&persona.cargo?`<div class="tec-card-cargo">${persona.cargo}</div>`:''}
+      <div class="tec-card-stats">🎒 ${nPkgs} · 🏷️ ${nSueltas}</div>
+    </div>`;
+  }).join('');
+  h+='</div>';
+  return h;
+}
+
+// Detalle de una persona (avatar + paquetes + instancias sueltas)
+function renderTecnicoDetalle(tec){
   const pkgs = paquetesData.filter(p=>p.responsable===tec);
   const instsSueltas = instanciasData.filter(i=>i.responsable===tec&&!i.paqueteId&&i.estado!=='BAJA');
   let h='';
@@ -4002,7 +4161,7 @@ function renderPorTecnico() {
     h+='</tbody></table></div>';
   } else { h+='<div style="font-size:12px;color:var(--muted2)">Sin instancias sueltas asignadas</div>'; }
   h+='</div>';
-  wrap.innerHTML=h;
+  return h;
 }
 
 

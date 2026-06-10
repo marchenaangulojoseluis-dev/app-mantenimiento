@@ -1519,7 +1519,7 @@ async function setPersonalFoto(i, file) {
   if (!/^image\//.test(file.type)) { toast('El archivo no es una imagen', 'err'); return; }
   try {
     toast('Procesando foto...');
-    const dataUrl = await compressSquare(file, 200, 0.8);
+    const dataUrl = await compressSquare(file, 320, 0.8);
     maestrosData.personal[i].foto = dataUrl;
     maestrosChanged = true;
     renderPersonal();

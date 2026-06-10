@@ -58,7 +58,7 @@ Modelo de 3 niveles:
 ## Firestore — colecciones
 | Colección | Descripción |
 |---|---|
-| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~200×200) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
+| `maestros_personal` | Colaboradores (id, nombre, cargo, telefono, activo, foto) — `foto` = imagen base64 (dataURL JPEG ~320×320) guardada en el propio documento. **No usa Firebase Storage** (el plan Spark ya no lo incluye; Storage exigiría Blaze) |
 | `asistencia_registros` | Registros de asistencia diaria |
 | `maestros_feriados` | Feriados (campo `fecha`: YYYY-MM-DD) |
 | `usuarios` | Usuarios del sistema con roles |
@@ -288,3 +288,4 @@ Todos los dominios de Cloudflare tunnel fueron eliminados.
 | 2026-06-08 | Insumos: tab "Por Técnico" muestra cabecera con avatar del técnico (foto de `maestros_personal` o inicial de respaldo) en `renderPorTecnico` |
 | 2026-06-08 | Backup (`configuracion.html`): columna `FOTO` agregada al export/import CSV de `maestros_personal` |
 | 2026-06-08 | Insumos (datos): recategorizado `GEN-01` "MANOMETRO" (4 instancias) de SIN CATEGORIA → MEDICION en Firestore. Script `migrar_db/recat_manometros.js` |
+| 2026-06-10 | Fotos del personal: avatar del tab "Por Técnico" agrandado de 56px → 96px (inicial 38px); captura de foto subida de 200×200 → 320×320 (sigue base64 en Firestore, ~40 KB). La miniatura del editor de personal se mantiene en 34px |

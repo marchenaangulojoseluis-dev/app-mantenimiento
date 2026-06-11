@@ -2715,6 +2715,55 @@ function exportInstCSVPhomemo() {
   toast('✓ CSV con ' + ids.length + ' códigos descargado', 'ok');
 }
 
+// ── EXPORTAR MATERIAL (CSV Excel-compatible) ───────────────
+// Lista detallada de instancias (material) por persona o por paquete.
+// Mismo patrón que exportInstCSVPhomemo: BOM UTF-8 para que Excel lea acentos.
+function _matCsvEsc(v){ const s = String(v == null ? '' : v); return /[",\n;]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s; }
+function _matSlug(s){ return (String(s||'').trim().toUpperCase().replace(/[^A-Z0-9]+/g,'_').replace(/^_|_$/g,'')) || 'X'; }
+
+// Construye el CSV de material a partir de una lista de instancias y lo descarga
+function _descargarMaterial(insts, filename, etiqueta){
+  if(!insts.length){ toast('No hay material para exportar', 'warn'); return; }
+  const headers = ['CODIGO','ITEM','COD. CATALOGO','CATEGORIA','SEDE','ESTADO','PAQUETE','RESPONSABLE'];
+  const rows = insts.map(i => {
+    const cat = catalogoData.find(c => c.id === i.itemId) || {};
+    const pkg = i.paqueteId ? paquetesData.find(p => p.id === i.paqueteId) : null;
+    const paqTxt = pkg ? (pkg.id + (pkg.nombre ? ' · ' + pkg.nombre : '')) : '—';
+    const resp = i.responsable || (pkg && pkg.responsable) || '';
+    return [i.id, i.nombre || cat.nombre || '', cat.codigo || '', cat.categoria || '', i.sede || '', i.estado || 'DISPONIBLE', paqTxt, resp].map(_matCsvEsc).join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  toast('✓ ' + etiqueta + ' — ' + insts.length + ' ítem' + (insts.length!==1?'s':'') + ' exportado' + (insts.length!==1?'s':''), 'ok');
+}
+
+// Material de una persona = instancias sueltas a su nombre + todas las de sus paquetes
+function exportMaterialPersona(tecArg){
+  const tec = tecArg || document.getElementById('f-tec-persona')?.value || '';
+  if(!tec || tec === '__ALL__'){ toast('Selecciona una persona primero', 'warn'); return; }
+  const pkgIds = new Set(paquetesData.filter(p => p.responsable === tec).map(p => p.id));
+  const insts = instanciasData.filter(i =>
+    i.estado !== 'BAJA' && (
+      (i.responsable === tec && !i.paqueteId) ||
+      (i.paqueteId && pkgIds.has(i.paqueteId))
+    )
+  ).sort((a,b) => (a.paqueteId||'~~').localeCompare(b.paqueteId||'~~') || String(a.id).localeCompare(String(b.id)));
+  _descargarMaterial(insts, 'material_' + _matSlug(tec) + '_' + new Date().toISOString().slice(0,10) + '.csv', 'Material de ' + tec);
+}
+
+// Material de un paquete = todas las instancias asignadas a ese paquete
+function exportMaterialPaquete(pkgId){
+  const pkg = paquetesData.find(p => p.id === pkgId);
+  if(!pkg){ toast('Paquete no encontrado', 'err'); return; }
+  const insts = instanciasData.filter(i => i.paqueteId === pkgId)
+    .sort((a,b) => String(a.id).localeCompare(String(b.id)));
+  _descargarMaterial(insts, 'material_' + _matSlug(pkg.id) + '_' + new Date().toISOString().slice(0,10) + '.csv', 'Material de ' + pkg.id);
+}
+
 // ── INSTANCIAS CRUD ───────────────────────────────────────
 let editingInstanciaId = null;
 
@@ -3774,6 +3823,7 @@ function renderPaquetes() {
         }).join('') : '<div style="font-size:11px;color:var(--muted2)">Sin instancias asignadas</div>'}
       </div>
       <div class="pkg-foot">
+        <button class="btn btn-sm" onclick="exportMaterialPaquete('${pkg.id}')" title="Exportar material del paquete (CSV)">⬇ Material</button>
         ${canEdit?`<button class="btn btn-sm" onclick="openModalPaquete('${pkg.id}')">✏️ Editar</button>`:''}
         <button class="btn btn-sm" onclick="openModalTransfPaquete('${pkg.id}')">🔄 Transferir</button>
         ${canEdit?`<button class="btn btn-sm btn-red" onclick="deletePaquete('${pkg.id}')">🗑</button>`:''}
@@ -4126,6 +4176,7 @@ function renderTecnicoDetalle(tec){
     ? `<img class="tec-head-avatar" src="${persona.foto}" alt="${tec}">`
     : `<div class="tec-head-init">${inicial}</div>`;
   h+=`<div class="tec-head">${avatarHtml}<div><div class="tec-head-name">${tec}</div>${persona&&persona.cargo?`<div class="tec-head-cargo">${persona.cargo}</div>`:''}</div></div>`;
+  h+=`<div style="margin:-4px 0 14px;display:flex;gap:8px;flex-wrap:wrap"><button class="btn btn-sm btn-primary" onclick="exportMaterialPersona()" title="Descargar todo el material asignado (paquetes + instancias sueltas)">⬇ Exportar material</button></div>`;
   // Paquetes
   h+=`<div class="tec-section"><div class="tec-section-title">🎒 Paquetes asignados (${pkgs.length})</div>`;
   if(pkgs.length){
@@ -4137,7 +4188,10 @@ function renderTecnicoDetalle(tec){
       return `<div class="pkg-card ${pkg.estado==='ACTIVO'?'activo':'inactivo'}">
         <div class="pkg-header">
           <div><div class="pkg-id">${ico} ${pkg.id}</div><div class="pkg-nombre">${pkg.nombre}</div><div style="margin-top:4px">${estBadge}</div></div>
-          <button class="qr-btn" onclick="openQRModal('${pkg.id}')" title="Ver QR">▣</button>
+          <div style="display:flex;gap:4px">
+            <button class="qr-btn" onclick="exportMaterialPaquete('${pkg.id}')" title="Exportar material del paquete">⬇</button>
+            <button class="qr-btn" onclick="openQRModal('${pkg.id}')" title="Ver QR">▣</button>
+          </div>
         </div>
         <div class="pkg-meta"><span>📍 ${pkg.sede||'—'}</span></div>
         <div class="pkg-insts">

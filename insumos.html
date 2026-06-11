@@ -1128,7 +1128,11 @@ tbody td{padding:9px 12px;vertical-align:middle}
       <div onclick="closeModal('modal-export-mat')" style="min-width:44px;min-height:44px;border-radius:8px;border:1.5px solid var(--border);background:var(--red-bg);color:var(--red);font-size:20px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center">✕</div>
     </div>
     <div style="font-weight:700;font-size:14px;color:var(--accent);margin-bottom:2px" id="exmat-title"></div>
-    <div style="font-size:12px;color:var(--muted2);margin-bottom:16px" id="exmat-sub"></div>
+    <div style="font-size:12px;color:var(--muted2);margin-bottom:12px" id="exmat-sub"></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;margin-bottom:14px;padding:9px 11px;background:var(--surface2);border-radius:8px;border:1px solid var(--border)">
+      <input type="checkbox" id="exmat-fotos" style="width:16px;height:16px">
+      <span>Incluir foto de cada instancia <span style="color:var(--muted2);font-size:11px">(solo PDF/PNG)</span></span>
+    </label>
     <div style="display:flex;flex-direction:column;gap:8px">
       <button class="btn btn-primary" style="justify-content:flex-start;font-size:14px;padding:12px 14px" onclick="doExportMat('pdf')">📄 PDF&nbsp;<span style="opacity:.85;font-weight:400">— recomendado, para imprimir o compartir</span></button>
       <button class="btn" style="justify-content:flex-start;font-size:14px;padding:12px 14px" onclick="doExportMat('png')">🖼️ Imagen PNG&nbsp;<span style="opacity:.7;font-weight:400">— para enviar por WhatsApp</span></button>
@@ -2743,13 +2747,13 @@ function _matSlug(s){ return (String(s||'').trim().toUpperCase().replace(/[^A-Z0
 // Construye el CSV de material a partir de una lista de instancias y lo descarga
 function _descargarMaterial(insts, filename, etiqueta){
   if(!insts.length){ toast('No hay material para exportar', 'warn'); return; }
-  const headers = ['CODIGO','ITEM','COD. CATALOGO','CATEGORIA','SEDE','ESTADO','PAQUETE','RESPONSABLE'];
+  const headers = ['CODIGO','ITEM','COD. CATALOGO','CATEGORIA','SEDE','ESTADO','PAQUETE','RESPONSABLE','FOTO'];
   const rows = insts.map(i => {
     const cat = catalogoData.find(c => c.id === i.itemId) || {};
     const pkg = i.paqueteId ? paquetesData.find(p => p.id === i.paqueteId) : null;
     const paqTxt = pkg ? (pkg.id + (pkg.nombre ? ' · ' + pkg.nombre : '')) : '—';
     const resp = i.responsable || (pkg && pkg.responsable) || '';
-    return [i.id, i.nombre || cat.nombre || '', cat.codigo || '', cat.categoria || '', i.sede || '', i.estado || 'DISPONIBLE', paqTxt, resp].map(_matCsvEsc).join(',');
+    return [i.id, i.nombre || cat.nombre || '', cat.codigo || '', cat.categoria || '', i.sede || '', i.estado || 'DISPONIBLE', paqTxt, resp, instFotos[i.id] ? 'SÍ' : 'NO'].map(_matCsvEsc).join(',');
   });
   const csv = [headers.join(','), ...rows].join('\n');
   const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' });
@@ -2810,6 +2814,7 @@ function _abrirSelectorExport(){
 }
 function doExportMat(fmt){
   if(!_exportMat) return;
+  _exportMat.conFotos = !!document.getElementById('exmat-fotos')?.checked;
   closeModal('modal-export-mat');
   if(fmt === 'csv') return _descargarMaterial(_exportMat.insts, _exportMat.baseName + '_' + _matFecha() + '.csv', _exportMat.titulo);
   if(fmt === 'png') return _exportMatPNG();
@@ -2841,12 +2846,25 @@ function _matFit(ctx, text, maxW){
   while(t.length>1 && ctx.measureText(t+'…').width > maxW) t = t.slice(0,-1);
   return t + '…';
 }
+// Carga una imagen (dataURL base64) y resuelve con el <img> listo (o null si falla)
+function _loadImg(src){ return new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; }); }
+
 // Dibuja el reporte del material en un canvas de alta resolución (base de PNG y PDF)
-function _matReportCanvas(){
+// Si _exportMat.conFotos: agrega una columna FOTO con la miniatura de cada instancia.
+async function _matReportCanvas(){
   const rows = _matRows(_exportMat.insts);
-  const cols = _matCols(_exportMat.showPaquete);
+  const conFotos = !!_exportMat.conFotos;
+  let cols = _matCols(_exportMat.showPaquete);
+  if(conFotos) cols = [{key:'_foto', label:'FOTO', w:0.95, foto:true}, ...cols];
+  // Pre-cargar las fotos disponibles (base64 → rápido, pero asíncrono)
+  const imgs = {};
+  if(conFotos){
+    const ids = rows.map(r => r.codigo).filter(id => instFotos[id]);
+    const loaded = await Promise.all(ids.map(id => _loadImg(instFotos[id])));
+    ids.forEach((id,k) => { if(loaded[k]) imgs[id] = loaded[k]; });
+  }
   const SC = 2, W = 900, padX = 32, innerW = W - padX*2;
-  const headH = 92, theadH = 30, rowH = 26, footH = 40;
+  const headH = 92, theadH = 30, rowH = conFotos ? 56 : 26, footH = 40;
   const H = headH + theadH + rows.length*rowH + footH;
   const canvas = document.createElement('canvas');
   canvas.width = W*SC; canvas.height = H*SC;
@@ -2872,6 +2890,23 @@ function _matReportCanvas(){
   rows.forEach((r,idx) => {
     if(idx%2===1){ ctx.fillStyle='#f5f8ff'; ctx.fillRect(padX,y,innerW,rowH); }
     cols.forEach(c => {
+      if(c.foto){
+        const sz = Math.min(rowH-10, c._w-12);
+        const fx = c._x + 6, fy = y + (rowH-sz)/2;
+        const im = imgs[r.codigo];
+        if(im){
+          const s = Math.min(im.width, im.height), sx = (im.width-s)/2, sy = (im.height-s)/2;
+          ctx.save(); ctx.beginPath(); ctx.rect(fx,fy,sz,sz); ctx.clip();
+          ctx.drawImage(im, sx, sy, s, s, fx, fy, sz, sz); ctx.restore();
+          ctx.strokeStyle='#d0daf0'; ctx.lineWidth=1; ctx.strokeRect(fx,fy,sz,sz);
+        } else {
+          ctx.fillStyle='#eef2f9'; ctx.fillRect(fx,fy,sz,sz);
+          ctx.strokeStyle='#d0daf0'; ctx.lineWidth=1; ctx.strokeRect(fx,fy,sz,sz);
+          ctx.save(); ctx.fillStyle='#a8b4cc'; ctx.font='400 9px Arial'; ctx.textAlign='center';
+          ctx.fillText('s/f', fx+sz/2, fy+sz/2); ctx.restore();
+        }
+        return;
+      }
       const val = String(r[c.key]==null?'':r[c.key]);
       if(c.key==='estado'){ ctx.fillStyle = estColor[val]||'#1a2540'; ctx.font='700 11px Arial'; }
       else { ctx.fillStyle = '#1a2540'; ctx.font = c.mono ? '600 11px monospace' : '400 12px Arial'; }
@@ -2887,17 +2922,17 @@ function _matReportCanvas(){
   ctx.fillText('MultiAire · Insumos · generado ' + new Date().toLocaleString('es-PE'), padX, y+22);
   return canvas;
 }
-function _exportMatPNG(){
-  const canvas = _matReportCanvas();
+async function _exportMatPNG(){
+  const canvas = await _matReportCanvas();
   const a = document.createElement('a');
   a.href = canvas.toDataURL('image/png', 1.0);
   a.download = _exportMat.baseName + '_' + _matFecha() + '.png';
   a.click();
   toast('✓ PNG descargado (' + _exportMat.insts.length + ' ítems)', 'ok');
 }
-function _exportMatPDF(){
+async function _exportMatPDF(){
   if(!(window.jspdf && window.jspdf.jsPDF)){ toast('PDF no disponible — usa PNG o CSV', 'err'); return; }
-  const canvas = _matReportCanvas();
+  const canvas = await _matReportCanvas();
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF('p','mm','a4');
   const pageW = pdf.internal.pageSize.getWidth();

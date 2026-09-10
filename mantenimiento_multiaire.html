@@ -2690,7 +2690,7 @@ function exportPDF() {
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px;background:#f8f9fc;border:1px solid #dde;border-top:none;border-radius:0 0 6px 6px">`;
 
     eqs.forEach(eq => {
-      const _a = actividadesDe(eq), tareas = _a.tareas, pesos = _a.minutos;
+      const _a = actividadesDe(eq), tareas = _a.tareas, mins = _a.minutos;
       const pct = getPct(eq);
       const col = pct===100?'#00aa44':pct>0?'#cc8800':'#cc2233';
       const statusMap = tareaStatus[eq.eq_id] || {};
@@ -2699,7 +2699,7 @@ function exportPDF() {
       if(tareas) {
         tareasHtml = tareas.map((t,i) => {
           const done = tareaHecha(statusMap, t, i);
-          const pw = pesos[i] != null ? `<span style="color:#999;font-size:9px;margin-left:auto">${pesos[i]}%</span>` : '';
+          const pw = mins[i] != null ? `<span style="color:#999;font-size:9px;margin-left:auto">${mins[i]}min</span>` : '';
           const isP = t==='Toma de parámetros';
           return `<div style="display:flex;align-items:center;gap:5px;padding:3px 0;${isP?'border-top:1px dashed #ccc;margin-top:3px;padding-top:5px':''}">
             <span style="color:${done?'#00aa44':'#cc2233'};font-size:13px;flex-shrink:0">${done?'✓':'✗'}</span>

@@ -246,17 +246,25 @@ function matchEquipo(equipoRaw, sede, equipos, cliente) {
   // de que el técnico haya escrito solo eso sin querer decir el código sube demasiado. En
   // sedes/equipos sin este campo cargado, este paso no encuentra nada y el flujo sigue exactamente
   // igual que antes.
+  // A diferencia del eq_id (clave del documento, no puede repetirse), el código de tienda es texto
+  // libre sin validación de unicidad al cargarlo — dos equipos de la misma sede podrían quedar con
+  // el mismo código por error de tipeo. Por eso NO se toma "el primero que calce" (`.find`): con un
+  // solo match resuelve directo; con más de uno, no se adivina cuál — se acota el pool de las
+  // siguientes etapas a esos candidatos (en vez de toda la sede) y se sigue afinando por tipo/
+  // ubicación/número, igual que si el técnico solo hubiera dicho el código.
+  let poolBase = delSede;
   if (qId.length >= 4) {
-    const porCodTienda = delSede.find((e) => e.codigoTienda
+    const porCodTienda = delSede.filter((e) => e.codigoTienda
       && e.codigoTienda.replace(/[^A-Z0-9]/gi, '').toUpperCase() === qId);
-    if (porCodTienda) return { ok: true, equipo: porCodTienda };
+    if (porCodTienda.length === 1) return { ok: true, equipo: porCodTienda[0] };
+    if (porCodTienda.length > 1) poolBase = porCodTienda;
   }
 
   // 2) si el técnico nombra un TIPO, restringimos a ese tipo (respeta "extractor …" → solo extractores).
-  const tiposSede = [...new Set(delSede.map((e) => e.tipo).filter(Boolean))];
+  const tiposSede = [...new Set(poolBase.map((e) => e.tipo).filter(Boolean))];
   const tipo = tipoMencionado(equipoRaw, tiposSede);
-  let pool = tipo ? delSede.filter((e) => e.tipo === tipo) : delSede;
-  if (!pool.length) pool = delSede;
+  let pool = tipo ? poolBase.filter((e) => e.tipo === tipo) : poolBase;
+  if (!pool.length) pool = poolBase;
 
   // 3) scoring por NOMBRE + ÁREA (ubicación) + número. El tipo ya filtró el pool;
   //    NO se puntúa por eq_id (su prefijo "MA" y su numeración de IMPORTACIÓN están en

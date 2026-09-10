@@ -356,8 +356,8 @@ async function gasPost(body) {
     };
     // merge: el doc de inventario también guarda el estado vivo de operatividad
     // (operatividad*, que escriben operatividad.html y el bot). Sin merge, editar la
-    // ficha del equipo lo borraba. Los 9 campos de arriba son los únicos que este
-    // módulo posee y se reescriben siempre, así que ninguno queda obsoleto.
+    // ficha del equipo lo borraba. Los campos de `equipo` de arriba son los únicos que
+    // este módulo posee y se reescriben siempre, así que ninguno queda obsoleto.
     await setDoc(doc(window.__db, 'inventario', equipo.eq_id), equipo, { merge: true });
     return { ok: true };
   }

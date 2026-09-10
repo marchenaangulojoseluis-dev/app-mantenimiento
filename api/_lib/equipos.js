@@ -236,6 +236,22 @@ function matchEquipo(equipoRaw, sede, equipos, cliente) {
     if (porId) return { ok: true, equipo: porId };
   }
 
+  // 1b) código PROPIO de la tienda (ej. "EC-005"): algunas sedes catalogan sus equipos con su
+  // propia numeración, además del eq_id de MultiAire (inventario_multiaire.html, campo opcional,
+  // editable solo desde la ficha del equipo). Se compara igual que el eq_id (solo alfanuméricos,
+  // sin distinguir mayúsculas) contra TODO el mensaje compactado — por eso exige coincidencia
+  // EXACTA (no substring): un mensaje largo con contenido de más no puede "reducirse por azar" a
+  // un código corto. El mínimo de 4 (vs. 6 del eq_id, que es largo y fijo) es el piso razonable
+  // para un código libre y corto tipeado por el cliente — por debajo de eso ("b2", "2") el riesgo
+  // de que el técnico haya escrito solo eso sin querer decir el código sube demasiado. En
+  // sedes/equipos sin este campo cargado, este paso no encuentra nada y el flujo sigue exactamente
+  // igual que antes.
+  if (qId.length >= 4) {
+    const porCodTienda = delSede.find((e) => e.codigoTienda
+      && e.codigoTienda.replace(/[^A-Z0-9]/gi, '').toUpperCase() === qId);
+    if (porCodTienda) return { ok: true, equipo: porCodTienda };
+  }
+
   // 2) si el técnico nombra un TIPO, restringimos a ese tipo (respeta "extractor …" → solo extractores).
   const tiposSede = [...new Set(delSede.map((e) => e.tipo).filter(Boolean))];
   const tipo = tipoMencionado(equipoRaw, tiposSede);

@@ -246,7 +246,7 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
   </div>
   <div class="main">
     <div class="toolbar">
-      <input type="text" id="search" placeholder="Buscar descripción, modelo, serie, capacidad..." oninput="af()">
+      <input type="text" id="search" placeholder="Buscar descripción, modelo, serie, capacidad, código de tienda..." oninput="af()">
       <button class="btn btn-sm inv-bulk" onclick="selAll()">☑ Todo</button>
       <button class="btn btn-sm inv-bulk" onclick="desel()">☐ Ninguno</button>
       <span class="cnt" id="cnt">— equipos</span>
@@ -274,6 +274,7 @@ input[type=checkbox]{accent-color:var(--blue);width:14px;height:14px}
       <div class="fgg"><label>Modelo</label><input type="text" id="f_modelo" placeholder="Ej: MKT3H-400"></div>
       <div class="fgg"><label>Serie</label><input type="text" id="f_serie" placeholder="Número de serie"></div>
       <div class="fgg"><label>Capacidad</label><input type="text" id="f_capacidad" placeholder="Ej: 24000 BTU · 130 TN · 2000 CFM"></div>
+      <div class="fgg"><label>Código de tienda</label><input type="text" id="f_codigoTienda" placeholder="Código propio del cliente (si lo usa)"></div>
     </div>
     <div class="ma">
       <button class="btn" onclick="cm()">Cancelar</button>
@@ -322,7 +323,7 @@ async function gasGet() {
   // Convert Firestore docs to array format matching original row structure
   return snap.docs.map(d => {
     const e = d.data();
-    return [e.eq_id||'', e.sede||'', e.cliente||'', e.tipo||'', e.nombre||'', e.area||'', e.marca||'', e.modelo||'', e.serie||'', e.capacidad||''];
+    return [e.eq_id||'', e.sede||'', e.cliente||'', e.tipo||'', e.nombre||'', e.area||'', e.marca||'', e.modelo||'', e.serie||'', e.capacidad||'', e.codigoTienda||''];
   });
 }
 
@@ -334,7 +335,7 @@ async function crearEquipoUnico(row) {
   const equipo = {
     eq_id: row[0], sede: row[1], cliente: row[2]||'RIPLEY',
     tipo: row[3], nombre: row[4], area: row[5],
-    marca: row[6], modelo: row[7], serie: row[8]||'', capacidad: row[9]||''
+    marca: row[6], modelo: row[7], serie: row[8]||'', capacidad: row[9]||'', codigoTienda: row[10]||''
   };
   const ref = window.__db.collection('inventario').doc(equipo.eq_id);
   await window.__db.runTransaction(async tx => {
@@ -351,7 +352,7 @@ async function gasPost(body) {
     const equipo = {
       eq_id: row[0], sede: row[1], cliente: row[2]||'RIPLEY',
       tipo: row[3], nombre: row[4], area: row[5],
-      marca: row[6], modelo: row[7], serie: row[8]||'', capacidad: row[9]||''
+      marca: row[6], modelo: row[7], serie: row[8]||'', capacidad: row[9]||'', codigoTienda: row[10]||''
     };
     // merge: el doc de inventario también guarda el estado vivo de operatividad
     // (operatividad*, que escriben operatividad.html y el bot). Sin merge, editar la
@@ -377,7 +378,7 @@ async function sync() {
       .filter(r => r[1] || r[3])
       .map((r,i) => ({
         row:i+2, eq_id:r[0]||'', sede:r[1]||'', cliente:r[2]||'', equipo:r[3]||'', descripcion:r[4]||'',
-        area:r[5]||'', marca:r[6]||'', modelo:r[7]||'', serie:r[8]||'', capacidad:r[9]||''
+        area:r[5]||'', marca:r[6]||'', modelo:r[7]||'', serie:r[8]||'', capacidad:r[9]||'', codigoTienda:r[10]||''
       }));
     setPill('ok', '✓ ' + data.length + ' equipos');
     pf(); af(); us();
@@ -467,7 +468,7 @@ function af() {
     if(skip!=='equipo'&&equipo&&r.equipo!==equipo)return false;
     if(skip!=='area'&&area&&r.area!==area)return false;
     if(skip!=='marca'&&marca&&r.marca!==marca)return false;
-    if(q){const h=[r.eq_id,r.descripcion,r.modelo,r.serie,r.capacidad,r.sede,r.equipo,r.area,r.marca].join(' ').toLowerCase();if(!h.includes(q))return false;}
+    if(q){const h=[r.eq_id,r.descripcion,r.modelo,r.serie,r.capacidad,r.sede,r.equipo,r.area,r.marca,r.codigoTienda].join(' ').toLowerCase();if(!h.includes(q))return false;}
     return true;
   };
   filtered=data.filter(r=>pass(r,null));
@@ -560,7 +561,7 @@ async function openNew(){
   editRow=null;
   document.getElementById('mtitle').textContent='Nuevo equipo';
   document.getElementById('sbtn').textContent='Guardar';
-  ['sede','equipo','desc','area','marca','modelo','serie','capacidad'].forEach(f=>{
+  ['sede','equipo','desc','area','marca','modelo','serie','capacidad','codigoTienda'].forEach(f=>{
     const el = document.getElementById('f_'+f);
     if(el) el.value='';
   });
@@ -568,7 +569,7 @@ async function openNew(){
   try { await cargarSedesMaestros(); } catch(e) { /* sedes ya pobladas en la carga inicial */ }
   document.getElementById('mov').classList.add('open');
 }
-function editItem(row){const r=data.find(x=>x.row===row);if(!r)return;cargarSedesMaestros();editRow=row;document.getElementById('mtitle').textContent='Editar equipo';document.getElementById('sbtn').textContent='Guardar cambios';document.getElementById('f_sede').value=r.sede;fillTipoForm(r.equipo);document.getElementById('f_desc').value=r.descripcion;document.getElementById('f_area').value=r.area;document.getElementById('f_marca').value=r.marca;document.getElementById('f_modelo').value=r.modelo;document.getElementById('f_serie').value=r.serie;document.getElementById('f_capacidad').value=r.capacidad||'';document.getElementById('mov').classList.add('open');}
+function editItem(row){const r=data.find(x=>x.row===row);if(!r)return;cargarSedesMaestros();editRow=row;document.getElementById('mtitle').textContent='Editar equipo';document.getElementById('sbtn').textContent='Guardar cambios';document.getElementById('f_sede').value=r.sede;fillTipoForm(r.equipo);document.getElementById('f_desc').value=r.descripcion;document.getElementById('f_area').value=r.area;document.getElementById('f_marca').value=r.marca;document.getElementById('f_modelo').value=r.modelo;document.getElementById('f_serie').value=r.serie;document.getElementById('f_capacidad').value=r.capacidad||'';document.getElementById('f_codigoTienda').value=r.codigoTienda||'';document.getElementById('mov').classList.add('open');}
 function cm(){document.getElementById('mov').classList.remove('open');}
 
 async function saveItem(){
@@ -610,7 +611,7 @@ async function saveItem(){
     // pero es un equipo aparte: falla por electrónica/parámetros, no por sello/rodamiento como
     // la bomba que controla — necesita su propia checklist, no la de la bomba.
     'VARIADOR DE FRECUENCIA':'VFR'};
-  const row=['',sede,cliente_val,tipo,desc,document.getElementById('f_area').value.trim(),document.getElementById('f_marca').value.trim(),document.getElementById('f_modelo').value.trim(),document.getElementById('f_serie').value.trim(),document.getElementById('f_capacidad').value.trim()];
+  const row=['',sede,cliente_val,tipo,desc,document.getElementById('f_area').value.trim(),document.getElementById('f_marca').value.trim(),document.getElementById('f_modelo').value.trim(),document.getElementById('f_serie').value.trim(),document.getElementById('f_capacidad').value.trim(),document.getElementById('f_codigoTienda').value.trim()];
   try{
     if(editRow!==null){
       row[0]=data.find(x=>x.row===editRow)?.eq_id||'';

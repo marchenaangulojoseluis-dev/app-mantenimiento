@@ -236,11 +236,35 @@ function matchEquipo(equipoRaw, sede, equipos, cliente) {
     if (porId) return { ok: true, equipo: porId };
   }
 
+  // 1b) código PROPIO de la tienda (ej. "EC-005"): algunas sedes catalogan sus equipos con su
+  // propia numeración, además del eq_id de MultiAire (inventario_multiaire.html, campo opcional,
+  // editable solo desde la ficha del equipo). Se compara igual que el eq_id (solo alfanuméricos,
+  // sin distinguir mayúsculas) contra TODO el mensaje compactado — por eso exige coincidencia
+  // EXACTA (no substring): un mensaje largo con contenido de más no puede "reducirse por azar" a
+  // un código corto. El mínimo de 4 (vs. 6 del eq_id, que es largo y fijo) es el piso razonable
+  // para un código libre y corto tipeado por el cliente — por debajo de eso ("b2", "2") el riesgo
+  // de que el técnico haya escrito solo eso sin querer decir el código sube demasiado. En
+  // sedes/equipos sin este campo cargado, este paso no encuentra nada y el flujo sigue exactamente
+  // igual que antes.
+  // A diferencia del eq_id (clave del documento, no puede repetirse), el código de tienda es texto
+  // libre sin validación de unicidad al cargarlo — dos equipos de la misma sede podrían quedar con
+  // el mismo código por error de tipeo. Por eso NO se toma "el primero que calce" (`.find`): con un
+  // solo match resuelve directo; con más de uno, no se adivina cuál — se acota el pool de las
+  // siguientes etapas a esos candidatos (en vez de toda la sede) y se sigue afinando por tipo/
+  // ubicación/número, igual que si el técnico solo hubiera dicho el código.
+  let poolBase = delSede;
+  if (qId.length >= 4) {
+    const porCodTienda = delSede.filter((e) => e.codigoTienda
+      && e.codigoTienda.replace(/[^A-Z0-9]/gi, '').toUpperCase() === qId);
+    if (porCodTienda.length === 1) return { ok: true, equipo: porCodTienda[0] };
+    if (porCodTienda.length > 1) poolBase = porCodTienda;
+  }
+
   // 2) si el técnico nombra un TIPO, restringimos a ese tipo (respeta "extractor …" → solo extractores).
-  const tiposSede = [...new Set(delSede.map((e) => e.tipo).filter(Boolean))];
+  const tiposSede = [...new Set(poolBase.map((e) => e.tipo).filter(Boolean))];
   const tipo = tipoMencionado(equipoRaw, tiposSede);
-  let pool = tipo ? delSede.filter((e) => e.tipo === tipo) : delSede;
-  if (!pool.length) pool = delSede;
+  let pool = tipo ? poolBase.filter((e) => e.tipo === tipo) : poolBase;
+  if (!pool.length) pool = poolBase;
 
   // 3) scoring por NOMBRE + ÁREA (ubicación) + número. El tipo ya filtró el pool;
   //    NO se puntúa por eq_id (su prefijo "MA" y su numeración de IMPORTACIÓN están en

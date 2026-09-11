@@ -39,7 +39,7 @@ function evidencia({ sede, ubic, fueraDePlan, horaExacta, ts }) {
 // LÓGICA PURA (testeable): a partir del registro existente (o null) construye el doc a escribir.
 // Devuelve { data } o { error } con error ∈ ya_entrada | sin_entrada | ya_salida | salida_antes.
 export function construirRegistro(existing, m) {
-  const { tipo, tecnico, fecha, horaDecimal, horaExacta, ts, sede, ubic, fueraDePlan } = m;
+  const { tipo, tecnico, fecha, horaDecimal, horaExacta, ts, sede, ubic, fueraDePlan, turnoNocturno } = m;
   const ev = evidencia({ sede, ubic, fueraDePlan, horaExacta, ts });
   const nota = notaMarca(ubic, fueraDePlan);
   const autor = `wa:${tecnico?.id || 'desconocido'}`;
@@ -72,7 +72,12 @@ export function construirRegistro(existing, m) {
   // SALIDA
   if (!existing || existing.horaEntrada == null) return { error: 'sin_entrada' };
   if (existing.horaSalida != null) return { error: 'ya_salida' };
-  if (horaDecimal <= existing.horaEntrada) return { error: 'salida_antes' };
+  // Turno nocturno (m.turnoNocturno === true, decisión explícita del CALLER — ver asistencia.js):
+  // la salida llegó ya cruzada la medianoche y se está cerrando el registro de AYER, así que su hora
+  // real (ej. 04:00 → 4.0) es NUMÉRICAMENTE menor que la de la entrada (ej. 22:00 → 22.0) sin que eso
+  // sea un error — es al revés, es la señal esperada. Fuera de ese caso, salida <= entrada del MISMO
+  // día sí es un error real (dato mal tipeado o mensaje repetido).
+  if (!turnoNocturno && horaDecimal <= existing.horaEntrada) return { error: 'salida_antes' };
   const data = {
     ...existing,
     horaSalida: horaDecimal,

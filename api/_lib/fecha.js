@@ -34,6 +34,16 @@ export function diaSemanaLima(base = Date.now()) {
   return ahoraLima(base).getUTCDay();
 }
 
+// 'YYYY-MM-DD' del día calendario ANTERIOR a `fechaISO` (aritmética de calendario pura, sin
+// zona horaria: `fechaISO` ya es una fecha-solo de Lima, así que basta tratarla como UTC-medianoche
+// y restar un día). Usado por el turno nocturno (asistencia.js): la salida que llega ya cruzada la
+// medianoche se busca/registra bajo el día en que arrancó la entrada, no el día del reloj actual.
+export function diaAnterior(fechaISO) {
+  const d = new Date(`${fechaISO}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() - 1);
+  return d.toISOString().slice(0, 10);
+}
+
 // Decimal (8.5) → "08:30".
 export function decimalAHHMM(dec) {
   if (dec == null || !Number.isFinite(Number(dec))) return '—';

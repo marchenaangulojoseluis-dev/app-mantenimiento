@@ -7,11 +7,17 @@
 //   RECOLECTA   → espera ubicación y/o selfie (en cualquier orden).
 //   ELIGE_SEDE  → su ubicación no cae dentro de ninguna sede: se pregunta en cuál está (tenga plan o no).
 import { evaluarSede, sedeQueContiene, fmtDistancia } from './geo.js';
-import { hoyLima, ahoraDecimalLima, horaHHMMLima, decimalAHHMM } from './fecha.js';
+import { hoyLima, ahoraDecimalLima, horaHHMMLima, decimalAHHMM, diaAnterior } from './fecha.js';
 import { sedesDelDia as _sedesDelDia } from './plan_dia.js';
 import { cargarTiendas as _cargarTiendas, tiendaPorId as _tiendaPorId, tiendasConGeo as _tiendasConGeo } from './tiendas.js';
 import { registrarMarcaje as _registrarMarcaje, registroDelDia as _registroDelDia } from './asistencia_registros.js';
 import * as _ses from './asistencia_sesiones.js';
+
+// Turno NOCTURNO (decisión del usuario, 2026-09-11): si la ENTRADA se marcó desde esta hora en
+// adelante, la SALIDA se busca/registra bajo el día de esa entrada aunque el reloj ya haya cruzado
+// medianoche — no hay ambigüedad real con "empezar un turno nuevo el día siguiente" porque un
+// técnico que entró de noche no vuelve a marcar entrada normal esa misma mañana (descansa).
+const HORA_INICIO_TURNO_NOCTURNO = 21; // 21.0 = 9:00 pm (decimal, mismo formato que horaEntrada)
 
 const RE_CANCELA = /^\s*(cancel\w*|anul\w*|olv[ií]d\w*|d[eé]jal\w*|no\s+import\w*|ya\s+no)/i;
 const RE_ENTRADA = /\b(entrada|entr[eé]|ingres\w*|llegu[eé]|ya\s+llegu|inici\w*\s+jornada)\b/i;
@@ -109,12 +115,37 @@ export async function manejarAsistencia({ tecnico, from, texto = '', ubicacion =
       return `Hola ${primerNombre(tecnico)}. Tu horario es *fijo*${horario}, así que no necesitas marcar por aquí: tu asistencia se registra automáticamente. ✅`;
     }
     const explicito = parseTipo(t);
-    const reg = await d.registroDelDia(tecnico.id, d.hoy);
+    let fecha = d.hoy;
+    let reg = await d.registroDelDia(tecnico.id, fecha);
+    let turnoNocturno = false;
+    // Turno nocturno: si HOY no hay entrada (o no se le pidió explícitamente una ENTRADA nueva),
+    // antes de asumir que falta marcar, se busca un turno de ANOCHE sin cerrar (entrada ≥ 21:00,
+    // sin salida). Si existe, el técnico está completando ESE turno, no empezando uno nuevo — el
+    // registro se ubica y se escribe bajo el día de esa entrada, aunque el reloj ya sea otro día.
+    //
+    // Ventana de cierre: esta búsqueda hacia atrás SOLO aplica si todavía es antes de las 21:00 de
+    // HOY (mismo umbral que define "es de noche"). Sin este límite, una semana de turnos nocturnos
+    // consecutivos se rompe: si UNA noche se olvida la salida y a la noche SIGUIENTE (ya pasadas las
+    // 21:00 otra vez) el técnico solo comparte ubicación para su entrada nueva, el bot intentaría
+    // "cerrar" el turno de anoche con la hora de HOY (un dato inventado y sin sentido) en vez de abrir
+    // el de hoy. Con la ventana, esa situación se trata como entrada nueva y el turno sin cerrar queda
+    // pendiente — visible en el módulo de Asistencia para completarlo a mano — en vez de contaminarse.
+    if (explicito !== 'ENTRADA' && !(reg && reg.horaEntrada != null) && ahoraDecimalLima(d.ahora) < HORA_INICIO_TURNO_NOCTURNO) {
+      const ayer = diaAnterior(d.hoy);
+      const regAyer = await d.registroDelDia(tecnico.id, ayer);
+      if (regAyer && regAyer.horaEntrada != null && regAyer.horaSalida == null && regAyer.horaEntrada >= HORA_INICIO_TURNO_NOCTURNO) {
+        fecha = ayer;
+        reg = regAyer;
+        turnoNocturno = true;
+      }
+    }
     const dt = decidirTipo(explicito, reg);
     if (dt.error) return errorTipo(dt.error, reg);
     ses = _ses.nuevaSesion(from, tecnico, dt.tipo);
+    ses.fecha = fecha;               // día bajo el que se escribe el marcaje (puede ser "ayer")
+    ses.turnoNocturno = turnoNocturno;
     try {
-      const plan = await d.sedesDelDia(tecnico.id, d.hoy);
+      const plan = await d.sedesDelDia(tecnico.id, fecha);
       ses.planSedes = plan.sedes || [];
     } catch (e) {
       console.error('[asistencia] error leyendo el plan del día:', e?.message);
@@ -212,13 +243,19 @@ async function avanzar(ses, msg, d) {
   const res = await d.registrarMarcaje({
     tipo: ses.tipo,
     tecnico: { id: ses.colabId, nombre: ses.nombre, cargo: ses.cargo },
-    fecha: d.hoy,
+    // `ses.fecha` es el día bajo el que se escribe el marcaje (fijado al decidir tipo — ver arriba);
+    // NO se recalcula acá con `d.hoy`: si la sesión venía recolectando ubicación/selfie en varios
+    // mensajes y el reloj cruzó medianoche en el camino, `d.hoy` ya sería el día nuevo y el marcaje
+    // se archivaría bajo la fecha equivocada. `|| d.hoy` es solo el fallback de una sesión sin este
+    // campo (persistida antes de este cambio; TTL 20 min, se agota solo).
+    fecha: ses.fecha || d.hoy,
     horaDecimal: ahoraDecimalLima(d.ahora),
     horaExacta: horaHHMMLima(d.ahora),
     ts: new Date(d.ahora).toISOString(),
     sede: ses.sede,
     ubic: ses.ubicacion,
     fueraDePlan: ses.fueraDePlan,
+    turnoNocturno: !!ses.turnoNocturno,
     selfie,
   });
   await d.store.limpiarSesion(from);

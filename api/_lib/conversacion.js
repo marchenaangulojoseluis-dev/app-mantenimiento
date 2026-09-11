@@ -189,7 +189,7 @@ async function resolverSedeEquipo(ses, b, { textoAcum, mensajeNuevo, g }) {
 
   // El matcher es determinístico y ya tolera typos por su cuenta (fonética + siglas + distancia de
   // edición), así que va PRIMERO.
-  let r = await resolverEquipo(sedeCruda, textoAcum, textoAcum);
+  let r = await resolverEquipo(sedeCruda, textoAcum, textoAcum, mensajeNuevo);
 
   // Ante una ambigüedad GENUINA entre dos sedes reales, Gemini tampoco desempata: se le pregunta al
   // técnico, que es el único que sabe.
@@ -200,7 +200,7 @@ async function resolverSedeEquipo(ses, b, { textoAcum, mensajeNuevo, g }) {
   // Gemini — y `elegirRescate` (compartida con mtto) decide si esa corrección probabilística puede
   // sustituir al resultado determinístico: no puede mudar de sede, no puede desempatar entre equipos
   // reales y no puede ensanchar la lista de candidatos.
-  const rg = await resolverEquipo(r.sede || g.sede || sedeCruda, g.equipo || textoAcum, textoAcum);
+  const rg = await resolverEquipo(r.sede || g.sede || sedeCruda, g.equipo || textoAcum, textoAcum, mensajeNuevo);
   return elegirRescate(r, rg);
 }
 

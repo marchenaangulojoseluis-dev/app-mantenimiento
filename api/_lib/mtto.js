@@ -688,7 +688,7 @@ async function intentarResolver(ses, texto, corregir, sedeRespuesta = null, mens
   // entraría al matcher como sede canónica y le ganaría por coincidencia exacta a lo que el
   // matcher ya había resuelto bien. Ante "chiller 1 de mac plaza norte", que Gemini conteste
   // "Plaza Norte" mandaría el registro a la sede equivocada (son dos sedes distintas y reales).
-  let r = await resolverEquipo(sedeCruda, texto, `${sedeCruda} ${texto}`);
+  let r = await resolverEquipo(sedeCruda, texto, `${sedeCruda} ${texto}`, mensajeNuevo);
 
   // Y ante una ambigüedad GENUINA entre dos sedes reales ("m plaza norte" = ¿PLAZA NORTE o MAC
   // PLAZA NORTE?), Gemini tampoco desempata: elegiría una con total aplomo. Se le pregunta al
@@ -714,7 +714,7 @@ async function intentarResolver(ses, texto, corregir, sedeRespuesta = null, mens
     }
     if (g && (g.sede || g.equipo)) {
       const { sedeTxt, equipoTxt } = aplicarCorreccion(texto, g);
-      const rg = await resolverEquipo(sedeFijada || sedeRespuesta || sedeTxt, equipoTxt, texto);
+      const rg = await resolverEquipo(sedeFijada || sedeRespuesta || sedeTxt, equipoTxt, texto, mensajeNuevo);
       r = elegirRescate(r, rg);
       if (!r.ok && r.motivo === 'sede' && r.sedeAmbigua) return pideSede(r);
     }

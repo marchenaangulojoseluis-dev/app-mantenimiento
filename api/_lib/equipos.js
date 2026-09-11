@@ -221,7 +221,7 @@ function tipoMencionado(equipoRaw, tiposSede) {
   });
 }
 
-function matchEquipo(equipoRaw, sede, equipos, cliente) {
+function matchEquipo(equipoRaw, sede, equipos, cliente, mensajeNuevo) {
   // Filtra por sede y, si se nombró un cliente, por ese cliente (desambigua sedes compartidas).
   let delSede = equipos.filter((e) => e.sede === sede && (!cliente || e.cliente === cliente));
   if (!delSede.length) delSede = equipos.filter((e) => e.sede === sede);
@@ -273,7 +273,17 @@ function matchEquipo(equipoRaw, sede, equipos, cliente) {
   //    tipo, ej. "Cortina de aire 04" contra el eq_id de "Cortina de aire 02").
   const qNum = conNumeros(equipoRaw);                    // "extractor uno" → "extractor 1"
   const qToks = tokens(qNum);
-  const qNumsTodos = (qNum.match(/\d+/g) || []).map((n) => parseInt(n, 10));
+  // El NÚMERO del equipo prioriza el ÚLTIMO mensaje del técnico sobre el resto de la conversación
+  // acumulada (`equipoRaw` puede traer varios turnos juntos — así resuelve un equipo descrito de a
+  // poco, ej. "el extractor" + "del comedor"). Pero un dígito dicho ANTES en la charla ("quiero
+  // registrar mantenimiento de las 8 cortinas de aire...") NO debe competir con el número que el
+  // técnico específica AHORA ("cortina de aire 01"): sin esto, "8" y "01" empataban en el match
+  // fuerte y el bot repreguntaba como si no hubiera entendido una respuesta que sí era específica
+  // (reporte real, Jockey Plaza, RIPLEY — 2026-09-11). Si el último mensaje no trae NINGÚN dígito
+  // (p.ej. solo aporta la ubicación), se sigue usando lo acumulado: el número pudo haber llegado en
+  // un turno anterior y no hay que perderlo.
+  const qNumFuente = (mensajeNuevo && /\d/.test(mensajeNuevo)) ? conNumeros(mensajeNuevo) : qNum;
+  const qNumsTodos = (qNumFuente.match(/\d+/g) || []).map((n) => parseInt(n, 10));
   // Números que acompañan una palabra de UBICACIÓN ("piso 2", "1er nivel", "piso nro 2",
   // "piso n° 2") no compiten por el match FUERTE del número propio del equipo — solo por el
   // de área (más débil). Sin esto, repetir la ubicación que el propio bot sugirió ("Cortina
@@ -282,7 +292,7 @@ function matchEquipo(equipoRaw, sede, equipos, cliente) {
   // OJO: "NRO/NUMERO + número" a secas ("cortina numero 4") es el número DEL EQUIPO — solo
   // cuenta como ubicación pegado a PISO/NIVEL. Orden de los replace: primero "palabra + número"
   // para que en "extractor 1 nivel 2" el 1 (equipo) sobreviva al 2º regex.
-  const qNumsFuertes = (qNum
+  const qNumsFuertes = (qNumFuente
     .replace(/\b(PISO|NIVEL)\s+((N|NO|NRO|NUMERO)\s+)?\d+/g, ' ')   // "piso 2", "nivel nro 3", "piso n° 2"
     .replace(/\b\d+[A-Z]{0,3}\s+(PISO|NIVEL)\b/g, ' ')         // "2do piso", "1 nivel" (de "1° nivel")
     .match(/\d+/g) || [])
@@ -435,7 +445,11 @@ export function opcionesEquipo(cands) {
   };
 }
 
-export async function resolverEquipo(sedeRaw, equipoRaw, textoCompleto) {
+// `mensajeNuevo` (opcional) = solo lo ÚLTIMO que dijo el técnico, cuando `equipoRaw`/`textoCompleto`
+// traen varios turnos acumulados — ver el comentario en `matchEquipo` sobre por qué el número
+// prioriza el último mensaje. Los llamadores existentes que no lo pasan (`undefined`) se comportan
+// exactamente igual que antes (usan el texto completo para todo, incluidos los números).
+export async function resolverEquipo(sedeRaw, equipoRaw, textoCompleto, mensajeNuevo) {
   const { equipos, sedes, clientes } = await cargarInventario();
   const cliente = clienteMencionado(textoCompleto || `${sedeRaw || ''} ${equipoRaw || ''}`, clientes);
   const t = matchSede(sedeRaw, sedes, clientes);
@@ -450,7 +464,7 @@ export async function resolverEquipo(sedeRaw, equipoRaw, textoCompleto) {
   if (clientesSede.length > 1 && !cliente) {
     return { ok: false, motivo: 'cliente', sede: t.sede, candidatosCliente: clientesSede };
   }
-  const e = matchEquipo(equipoRaw, t.sede, equipos, cliente);
+  const e = matchEquipo(equipoRaw, t.sede, equipos, cliente, mensajeNuevo);
   if (!e.ok) return { ok: false, motivo: 'equipo', sede: t.sede, candidatosEquipo: e.candidatos };
   return { ok: true, sede: t.sede, equipo: e.equipo };
 }
